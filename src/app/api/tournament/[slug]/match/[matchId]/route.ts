@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { scoreSchema } from "@/lib/validators";
-import type { SetScore } from "@/types";
+import { determineMatchWinner, validateScores } from "@/lib/scoring";
+import type { SetScore, MatchFormat } from "@/types";
 
 export async function PUT(
   req: NextRequest,
@@ -37,22 +38,22 @@ export async function PUT(
   }
 
   const scores: SetScore[] = parsed.data.scores;
+  const matchFormat = (tournament.matchFormat || 'B1') as MatchFormat;
 
-  // Determine winner (best of setsToWin*2-1)
-  let team1Sets = 0;
-  let team2Sets = 0;
-  for (const s of scores) {
-    if (s.team1 > s.team2) team1Sets++;
-    else if (s.team2 > s.team1) team2Sets++;
-    else return NextResponse.json({ error: "Empate num set não é permitido" }, { status: 400 });
+  // Validate scores using scoring rules
+  const validation = validateScores(scores, matchFormat);
+  if (!validation.valid) {
+    return NextResponse.json({ error: validation.error ?? "Resultado inválido" }, { status: 400 });
   }
 
-  if (team1Sets === team2Sets) {
+  // Determine winner using scoring logic
+  const matchWinner = determineMatchWinner(scores, matchFormat);
+  if (!matchWinner) {
     return NextResponse.json({ error: "Resultado ainda não tem vencedor" }, { status: 400 });
   }
 
-  const winnerId = team1Sets > team2Sets ? match.team1Id : match.team2Id;
-  const loserId = team1Sets > team2Sets ? match.team2Id : match.team1Id;
+  const winnerId = matchWinner === 1 ? match.team1Id : match.team2Id;
+  const loserId = matchWinner === 1 ? match.team2Id : match.team1Id;
 
   const result = await prisma.$transaction(async (tx) => {
     const updatedMatch = await tx.match.update({

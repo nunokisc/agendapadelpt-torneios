@@ -14,8 +14,7 @@ model Tournament {
   description String?
   format      String
   status      String   @default("draft")
-  setsToWin   Int      @default(1)
-  pointsPerSet Int     @default(24)
+  matchFormat String   @default("B1")
   thirdPlace  Boolean  @default(false)
   groupCount  Int?
   advanceCount Int?

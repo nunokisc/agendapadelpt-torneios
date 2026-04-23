@@ -12,6 +12,8 @@ import RoundRobinTable from "@/components/bracket/RoundRobinTable";
 import GroupStageView from "@/components/bracket/GroupStageView";
 import Button from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { useToast } from "@/components/ui/ToastProvider";
+import { BracketSkeleton } from "@/components/ui/Skeleton";
 import type { Tournament, Player, Match } from "@/types";
 
 interface TournamentData {
@@ -24,6 +26,7 @@ export default function TournamentPage() {
   const token = searchParams.get("token") ?? "";
   const isAdmin = Boolean(token);
 
+  const { toast } = useToast();
   const [data, setData] = useState<TournamentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -47,6 +50,13 @@ export default function TournamentPage() {
     fetchData();
   }, [fetchData]);
 
+  // Auto-refresh every 30s for the public view so spectators see live scores
+  useEffect(() => {
+    if (isAdmin) return;
+    const interval = setInterval(fetchData, 30_000);
+    return () => clearInterval(interval);
+  }, [isAdmin, fetchData]);
+
   async function handleGenerate() {
     setGenerating(true);
     setApiError(null);
@@ -59,6 +69,7 @@ export default function TournamentPage() {
         throw new Error(d.error ?? "Erro ao gerar bracket");
       }
       await fetchData();
+      toast("Bracket gerado com sucesso!");
     } catch (err) {
       setApiError(err instanceof Error ? err.message : "Erro desconhecido");
     } finally {
@@ -75,8 +86,20 @@ export default function TournamentPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <div className="animate-spin h-8 w-8 border-4 border-emerald-500 border-t-transparent rounded-full" />
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        <div className="h-16 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-xl mb-6" />
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+          <div className="xl:col-span-1 space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-10 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg" />
+            ))}
+          </div>
+          <div className="xl:col-span-3">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4 overflow-x-auto">
+              <BracketSkeleton />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -219,6 +242,19 @@ export default function TournamentPage() {
             {/* Main: bracket */}
             <div className="xl:col-span-3">
               <Card padding="md">
+                <div className="flex items-center justify-end mb-3">
+                  <a
+                    href={token ? `/tournament/${slug}/bracket?token=${token}` : `/tournament/${slug}/bracket`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+                  >
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                    Ecrã completo
+                  </a>
+                </div>
                 <div className="overflow-x-auto">
                   {renderBracket()}
                 </div>
@@ -233,6 +269,7 @@ export default function TournamentPage() {
         match={selectedMatch}
         slug={slug}
         token={token}
+        matchFormat={tournament.matchFormat}
         onClose={() => setSelectedMatch(null)}
         onSaved={fetchData}
       />

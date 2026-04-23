@@ -6,7 +6,8 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
-import type { TournamentFormat } from "@/types";
+import type { TournamentFormat, MatchFormat } from "@/types";
+import { FORMAT_LABELS } from "@/lib/scoring";
 
 const FORMAT_OPTIONS = [
   { value: "single_elimination", label: "Eliminação Simples" },
@@ -15,17 +16,17 @@ const FORMAT_OPTIONS = [
   { value: "groups_knockout", label: "Fase de Grupos + Eliminação" },
 ];
 
-const SETS_OPTIONS = [
-  { value: 1, label: "1 set" },
-  { value: 2, label: "Melhor de 3 (2 sets para ganhar)" },
-  { value: 3, label: "Melhor de 5 (3 sets para ganhar)" },
-];
-
-const POINTS_OPTIONS = [
-  { value: 24, label: "24 pontos" },
-  { value: 21, label: "21 pontos" },
-  { value: 16, label: "16 pontos" },
-  { value: 11, label: "11 pontos" },
+const MATCH_FORMAT_OPTIONS: { value: MatchFormat; label: string }[] = [
+  { value: "A1", label: "A1 — 3 sets a 6 jogos (vantagem)" },
+  { value: "A2", label: "A2 — 3 sets a 6 jogos (No-Ad)" },
+  { value: "B1", label: "B1 — 2 sets a 6 jogos + Super Tie-Break a 10" },
+  { value: "B2", label: "B2 — 2 sets a 6 jogos (No-Ad) + Super Tie-Break a 10" },
+  { value: "C1", label: "C1 — 2 sets a 4 jogos + Super Tie-Break a 10" },
+  { value: "C2", label: "C2 — 2 sets a 4 jogos (No-Ad) + Super Tie-Break a 10" },
+  { value: "D1", label: "D1 — 1 set a 9 jogos" },
+  { value: "D2", label: "D2 — 1 set a 9 jogos (No-Ad)" },
+  { value: "E", label: "E — Super Tie-Break a 10 (ultra-rápido)" },
+  { value: "F", label: "F — 1 set a 4 jogos (No-Ad)" },
 ];
 
 const GROUP_COUNT_OPTIONS = Array.from({ length: 7 }, (_, i) => ({
@@ -48,8 +49,7 @@ export default function CreateTournamentForm() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [format, setFormat] = useState<TournamentFormat>("single_elimination");
-  const [setsToWin, setSetsToWin] = useState(1);
-  const [pointsPerSet, setPointsPerSet] = useState(24);
+  const [matchFormat, setMatchFormat] = useState<MatchFormat>("B1");
   const [thirdPlace, setThirdPlace] = useState(false);
   const [groupCount, setGroupCount] = useState(2);
   const [advanceCount, setAdvanceCount] = useState(2);
@@ -71,8 +71,7 @@ export default function CreateTournamentForm() {
         name: name.trim(),
         description: description.trim() || undefined,
         format,
-        setsToWin,
-        pointsPerSet,
+        matchFormat,
         thirdPlace: isSingle ? thirdPlace : false,
       };
       if (isGroups) {
@@ -132,25 +131,22 @@ export default function CreateTournamentForm() {
         </div>
 
         <Select
-          label="Formato"
+          label="Formato do torneio"
           options={FORMAT_OPTIONS}
           value={format}
           onChange={(e) => setFormat(e.target.value as TournamentFormat)}
         />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="flex flex-col gap-1">
           <Select
-            label="Sets para ganhar"
-            options={SETS_OPTIONS}
-            value={setsToWin}
-            onChange={(e) => setSetsToWin(Number(e.target.value))}
+            label="Formato do jogo"
+            options={MATCH_FORMAT_OPTIONS}
+            value={matchFormat}
+            onChange={(e) => setMatchFormat(e.target.value as MatchFormat)}
           />
-          <Select
-            label="Pontos por set"
-            options={POINTS_OPTIONS}
-            value={pointsPerSet}
-            onChange={(e) => setPointsPerSet(Number(e.target.value))}
-          />
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            {FORMAT_LABELS[matchFormat]}
+          </p>
         </div>
 
         {isSingle && (

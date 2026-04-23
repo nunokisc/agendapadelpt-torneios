@@ -7,9 +7,10 @@ interface MatchCardProps {
   match: Match;
   isAdmin: boolean;
   onClick?: () => void;
+  highlight?: boolean;
 }
 
-export default function MatchCard({ match, isAdmin, onClick }: MatchCardProps) {
+export default function MatchCard({ match, isAdmin, onClick, highlight }: MatchCardProps) {
   const scores: SetScore[] = match.scores ? JSON.parse(match.scores) : [];
   const team1Sets = scores.filter((s) => s.team1 > s.team2).length;
   const team2Sets = scores.filter((s) => s.team2 > s.team1).length;
@@ -74,7 +75,7 @@ export default function MatchCard({ match, isAdmin, onClick }: MatchCardProps) {
     <div
       className={cn(
         "w-[220px] rounded-lg border-2 overflow-hidden transition-all select-none",
-        statusBg,
+        highlight ? "border-yellow-400 shadow-yellow-200 shadow-md dark:border-yellow-500 dark:shadow-yellow-900/50" : statusBg,
         canEdit && "cursor-pointer hover:border-emerald-400 hover:shadow-md active:scale-95"
       )}
       style={{ minHeight: 72 }}

@@ -1,7 +1,8 @@
 "use client";
 
 import Badge from "@/components/ui/Badge";
-import type { Tournament } from "@/types";
+import type { Tournament, MatchFormat } from "@/types";
+import { FORMAT_LABELS as MATCH_FORMAT_LABELS } from "@/lib/scoring";
 
 const FORMAT_LABELS: Record<string, string> = {
   single_elimination: "Eliminação Simples",
@@ -51,8 +52,10 @@ export default function TournamentHeader({ tournament, isAdmin }: TournamentHead
           )}
         </div>
         <div className="text-right text-sm text-slate-500 dark:text-slate-400 shrink-0">
-          <p>Sets para ganhar: <strong>{tournament.setsToWin}</strong></p>
-          <p>Pontos por set: <strong>{tournament.pointsPerSet}</strong></p>
+          <p className="font-mono font-bold text-slate-700 dark:text-slate-300">{tournament.matchFormat}</p>
+          <p className="text-xs max-w-48 text-right">
+            {MATCH_FORMAT_LABELS[tournament.matchFormat as MatchFormat] ?? tournament.matchFormat}
+          </p>
         </div>
       </div>
     </div>

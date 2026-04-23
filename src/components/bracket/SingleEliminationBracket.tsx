@@ -133,6 +133,15 @@ export default function SingleEliminationBracket({ matches, isAdmin, onMatchClic
   const thirdPlace = matches.filter((m) => m.bracketType === "third_place");
   const allVisible = [...winners, ...thirdPlace];
 
+  // Compute winner path: all match IDs won by the overall tournament winner
+  const finalMatch = winners.find((m) => m.round === Math.max(...winners.map((x) => x.round)));
+  const tournamentWinnerId = finalMatch?.winnerId ?? null;
+  const winnerPathIds = new Set(
+    tournamentWinnerId
+      ? allVisible.filter((m) => m.winnerId === tournamentWinnerId).map((m) => m.id)
+      : []
+  );
+
   if (winners.length === 0) {
     return (
       <div className="text-center py-16 text-slate-400 text-sm">
@@ -193,6 +202,7 @@ export default function SingleEliminationBracket({ matches, isAdmin, onMatchClic
                 match={m}
                 isAdmin={isAdmin}
                 onClick={() => onMatchClick(m)}
+                highlight={winnerPathIds.has(m.id)}
               />
             </div>
           );

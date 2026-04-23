@@ -9,8 +9,7 @@ export const createTournamentSchema = z.object({
     "round_robin",
     "groups_knockout",
   ]),
-  setsToWin: z.number().int().min(1).max(3),
-  pointsPerSet: z.number().int().min(11).max(50),
+  matchFormat: z.enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'D1', 'D2', 'E', 'F']).default('B1'),
   thirdPlace: z.boolean().optional().default(false),
   groupCount: z.number().int().min(2).max(8).optional(),
   advanceCount: z.number().int().min(1).max(4).optional(),
@@ -26,6 +25,11 @@ export const scoreSchema = z.object({
     z.object({
       team1: z.number().int().min(0),
       team2: z.number().int().min(0),
+      tiebreak: z.object({
+        team1: z.number().int().min(0),
+        team2: z.number().int().min(0),
+      }).optional(),
+      superTiebreak: z.boolean().optional(),
     })
   ).min(1),
 });

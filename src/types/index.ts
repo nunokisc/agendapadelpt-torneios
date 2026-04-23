@@ -15,9 +15,13 @@ export type BracketType =
   | "group"
   | "third_place";
 
+export type MatchFormat = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2' | 'D1' | 'D2' | 'E' | 'F';
+
 export interface SetScore {
   team1: number;
   team2: number;
+  tiebreak?: { team1: number; team2: number };
+  superTiebreak?: boolean;
 }
 
 export interface Tournament {
@@ -28,8 +32,7 @@ export interface Tournament {
   description: string | null;
   format: TournamentFormat;
   status: TournamentStatus;
-  setsToWin: number;
-  pointsPerSet: number;
+  matchFormat: string;
   thirdPlace: boolean;
   groupCount: number | null;
   advanceCount: number | null;
@@ -74,8 +77,7 @@ export interface CreateTournamentInput {
   name: string;
   description?: string;
   format: TournamentFormat;
-  setsToWin: number;
-  pointsPerSet: number;
+  matchFormat?: string;
   thirdPlace?: boolean;
   groupCount?: number;
   advanceCount?: number;

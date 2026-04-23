@@ -1,40 +1,149 @@
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import SingleEliminationBracket from "@/components/bracket/SingleEliminationBracket";
+import DoubleEliminationBracket from "@/components/bracket/DoubleEliminationBracket";
+import RoundRobinTable from "@/components/bracket/RoundRobinTable";
+import GroupStageView from "@/components/bracket/GroupStageView";
+import ScoreInputModal from "@/components/tournament/ScoreInputModal";
+import type { Tournament, Player, Match } from "@/types";
 
-export default async function BracketPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  const { slug } = await params;
-  const tournament = await prisma.tournament.findUnique({
-    where: { slug },
-    include: {
-      players: { orderBy: { seed: "asc" } },
-      matches: {
-        include: { team1: true, team2: true, winner: true },
-        orderBy: [{ round: "asc" }, { position: "asc" }],
-      },
-    },
-  });
+interface TournamentData {
+  tournament: Tournament & { players: Player[]; matches: Match[] };
+}
 
-  if (!tournament) notFound();
+export default function FullscreenBracketPage() {
+  const { slug } = useParams<{ slug: string }>();
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token") ?? "";
+  const isAdmin = Boolean(token);
+
+  const [data, setData] = useState<TournamentData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/tournament/${slug}`);
+      if (!res.ok) return;
+      const json = await res.json();
+      setData(json);
+    } finally {
+      setLoading(false);
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  function handleMatchClick(match: Match) {
+    if (!isAdmin) return;
+    if (match.status === "bye") return;
+    if (!match.team1Id || !match.team2Id) return;
+    setSelectedMatch(match);
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-emerald-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400 text-sm">
+        Torneio não encontrado.
+      </div>
+    );
+  }
+
+  const { tournament } = data;
+
+  function renderBracket() {
+    const { matches, players, format, groupCount } = tournament;
+    if (format === "single_elimination") {
+      return (
+        <SingleEliminationBracket
+          matches={matches}
+          isAdmin={isAdmin}
+          onMatchClick={handleMatchClick}
+        />
+      );
+    }
+    if (format === "double_elimination") {
+      return (
+        <DoubleEliminationBracket
+          matches={matches}
+          isAdmin={isAdmin}
+          onMatchClick={handleMatchClick}
+        />
+      );
+    }
+    if (format === "round_robin") {
+      return (
+        <RoundRobinTable
+          matches={matches}
+          players={players}
+          isAdmin={isAdmin}
+          onMatchClick={handleMatchClick}
+        />
+      );
+    }
+    if (format === "groups_knockout") {
+      return (
+        <GroupStageView
+          matches={matches}
+          players={players}
+          isAdmin={isAdmin}
+          onMatchClick={handleMatchClick}
+          groupCount={groupCount ?? 2}
+        />
+      );
+    }
+    return null;
+  }
+
+  const backUrl = token ? `/tournament/${slug}?token=${token}` : `/tournament/${slug}`;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">{tournament.name}</h1>
+    <div className="min-h-screen bg-slate-950 text-white">
+      {/* Minimal top bar */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+        <div>
+          <h1 className="text-lg font-bold text-slate-100">{tournament.name}</h1>
+          <p className="text-xs text-slate-400 mt-0.5 font-mono">{tournament.matchFormat}</p>
+        </div>
         <Link
-          href={`/tournament/${slug}`}
-          className="text-sm text-slate-400 hover:text-white transition-colors"
+          href={backUrl}
+          className="text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-1.5"
         >
-          ← Voltar
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Voltar
         </Link>
       </div>
-      <p className="text-slate-400 text-sm">
-        Vista fullscreen disponível na próxima fase.
-      </p>
+
+      {/* Bracket */}
+      <div className="p-6 overflow-auto">
+        {renderBracket()}
+      </div>
+
+      {isAdmin && (
+        <ScoreInputModal
+          match={selectedMatch}
+          slug={slug}
+          token={token}
+          matchFormat={tournament.matchFormat}
+          onClose={() => setSelectedMatch(null)}
+          onSaved={fetchData}
+        />
+      )}
     </div>
   );
 }
