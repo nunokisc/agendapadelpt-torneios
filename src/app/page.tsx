@@ -1,4 +1,5 @@
 import CreateTournamentForm from "@/components/tournament/CreateTournamentForm";
+import MyTournaments from "@/components/tournament/MyTournaments";
 
 export default function HomePage() {
   return (
@@ -12,7 +13,8 @@ export default function HomePage() {
         </p>
       </div>
 
-      <div className="flex justify-center">
+      <div className="flex flex-col items-center gap-6">
+        <MyTournaments />
         <CreateTournamentForm />
       </div>
     </div>

@@ -8,6 +8,7 @@ import Select from "@/components/ui/Select";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import type { TournamentFormat, MatchFormat } from "@/types";
 import { FORMAT_LABELS } from "@/lib/scoring";
+import { saveTournament } from "@/lib/my-tournaments";
 
 const FORMAT_OPTIONS = [
   { value: "single_elimination", label: "Eliminação Simples" },
@@ -91,6 +92,12 @@ export default function CreateTournamentForm() {
       }
 
       const data = await res.json();
+      saveTournament({
+        slug: data.tournament.slug,
+        name: name.trim(),
+        adminToken: data.adminToken,
+        createdAt: new Date().toISOString(),
+      });
       router.push(data.adminUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
