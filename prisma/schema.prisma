@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Tournament {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  adminToken  String   @unique
+  name        String
+  description String?
+  format      String
+  status      String   @default("draft")
+  setsToWin   Int      @default(1)
+  pointsPerSet Int     @default(24)
+  thirdPlace  Boolean  @default(false)
+  groupCount  Int?
+  advanceCount Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  players Player[]
+  matches Match[]
+}
+
+model Player {
+  id           String  @id @default(cuid())
+  name         String
+  seed         Int?
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  groupIndex   Int?
+
+  matchesAsTeam1 Match[] @relation("Team1")
+  matchesAsTeam2 Match[] @relation("Team2")
+  matchWinners   Match[] @relation("Winner")
+}
+
+model Match {
+  id            String  @id @default(cuid())
+  tournamentId  String
+  tournament    Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  round         Int
+  position      Int
+  bracketType   String  @default("winners")
+  groupIndex    Int?
+
+  team1Id       String?
+  team1         Player? @relation("Team1", fields: [team1Id], references: [id])
+  team2Id       String?
+  team2         Player? @relation("Team2", fields: [team2Id], references: [id])
+  winnerId      String?
+  winner        Player? @relation("Winner", fields: [winnerId], references: [id])
+
+  scores        String?
+
+  status        String  @default("pending")
+
+  nextMatchId      String?
+  nextMatchSlot    Int?
+  loserNextMatchId String?
+  loserNextSlot    Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
