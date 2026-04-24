@@ -69,28 +69,29 @@ export function generateSingleElimination(
     offset += matchesInRound;
   }
 
-  // Third place match — wire losers of semi-finals into it
+  // Third place match — only when there are ≥2 real (non-bye) semi-finals
+  // With 3 players one semi is a bye, so no loser exists to fill the 3rd place slot
   if (thirdPlace && rounds >= 2) {
-    const thirdPlaceIndex = matches.length;
-    matches.push({
-      round: rounds,
-      position: 1,
-      bracketType: "third_place",
-      team1Index: null,
-      team2Index: null,
-      status: "pending",
-    });
-
-    // Semi-finals are the two matches in round = rounds-1
-    // They're at the end of the winners section (before this third_place push)
     const semiRound = rounds - 1;
-    let semiSlot = 1;
-    for (let i = 0; i < matches.length - 1; i++) {
-      if (matches[i].round === semiRound && matches[i].bracketType === "winners") {
-        matches[i].loserNextMatchIndex = thirdPlaceIndex;
-        matches[i].loserNextSlot = semiSlot;
-        semiSlot++;
-      }
+    const realSemiIndices = matches
+      .map((m, i) => ({ m, i }))
+      .filter(({ m }) => m.round === semiRound && m.bracketType === "winners" && m.status !== "bye")
+      .map(({ i }) => i);
+
+    if (realSemiIndices.length >= 2) {
+      const thirdPlaceIndex = matches.length;
+      matches.push({
+        round: rounds,
+        position: 1,
+        bracketType: "third_place",
+        team1Index: null,
+        team2Index: null,
+        status: "pending",
+      });
+      realSemiIndices.forEach((idx, slot) => {
+        matches[idx].loserNextMatchIndex = thirdPlaceIndex;
+        matches[idx].loserNextSlot = slot + 1;
+      });
     }
   }
 
