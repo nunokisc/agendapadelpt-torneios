@@ -24,6 +24,8 @@ export default function MatchCard({ match, isAdmin, onClick, highlight }: MatchC
     match.team1Id &&
     match.team2Id;
 
+  const isRescore = canEdit && isCompleted;
+
   const statusBg = isBye
     ? "border-dashed border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50"
     : isCompleted
@@ -92,7 +94,7 @@ export default function MatchCard({ match, isAdmin, onClick, highlight }: MatchC
       )}
       style={{ minHeight: 72 }}
       onClick={canEdit ? onClick : undefined}
-      title={canEdit ? "Clica para introduzir resultado" : undefined}
+      title={canEdit ? (isRescore ? "Clica para editar resultado" : "Clica para introduzir resultado") : undefined}
     >
       {isBye ? (
         <div className="flex items-center justify-center h-full py-4 text-xs text-slate-400 italic">

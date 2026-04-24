@@ -25,6 +25,10 @@ export function computeGroupStandings(
     stats.set(pid, { playerId: pid, wins: 0, losses: 0, setsFor: 0, setsAgainst: 0, gamesFor: 0, gamesAgainst: 0 });
   }
 
+  // Build head-to-head map: h2h[A][B] = 1 if A beat B, -1 if A lost to B, 0 if not played
+  const h2h = new Map<string, Map<string, number>>();
+  for (const pid of playerIds) h2h.set(pid, new Map());
+
   for (const m of matches) {
     if (m.status !== "completed" || !m.team1Id || !m.team2Id || !m.scores) continue;
     const scores: SetScore[] = JSON.parse(m.scores);
@@ -46,13 +50,29 @@ export function computeGroupStandings(
       t2.setsFor += s2; t2.setsAgainst += s1;
       t2.gamesFor += g2; t2.gamesAgainst += g1;
     }
+    // Record head-to-head
+    if (m.winnerId === m.team1Id) {
+      h2h.get(m.team1Id)?.set(m.team2Id, 1);
+      h2h.get(m.team2Id)?.set(m.team1Id, -1);
+    } else if (m.winnerId === m.team2Id) {
+      h2h.get(m.team2Id)?.set(m.team1Id, 1);
+      h2h.get(m.team1Id)?.set(m.team2Id, -1);
+    }
   }
 
   return Array.from(stats.values()).sort((a, b) => {
+    // 1. Wins (descending)
     if (b.wins !== a.wins) return b.wins - a.wins;
+    // 2. Set differential
     const sdA = a.setsFor - a.setsAgainst;
     const sdB = b.setsFor - b.setsAgainst;
     if (sdB !== sdA) return sdB - sdA;
-    return (b.gamesFor - b.gamesAgainst) - (a.gamesFor - a.gamesAgainst);
+    // 3. Game differential
+    const gdA = a.gamesFor - a.gamesAgainst;
+    const gdB = b.gamesFor - b.gamesAgainst;
+    if (gdB !== gdA) return gdB - gdA;
+    // 4. Head-to-head (final tiebreaker for exact 2-way ties)
+    const h2hResult = h2h.get(a.playerId)?.get(b.playerId) ?? 0;
+    return -h2hResult;
   });
 }

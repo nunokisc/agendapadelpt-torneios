@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { addPlayersSchema } from "@/lib/validators";
+import { extractAdminToken } from "@/lib/auth-server";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const token = req.nextUrl.searchParams.get("token");
+  const token = extractAdminToken(req, slug);
 
   const tournament = await prisma.tournament.findUnique({ where: { slug } });
   if (!tournament) {
@@ -57,7 +58,7 @@ export async function PUT(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const token = req.nextUrl.searchParams.get("token");
+  const token = extractAdminToken(req, slug);
 
   const tournament = await prisma.tournament.findUnique({ where: { slug } });
   if (!tournament) {
@@ -93,7 +94,7 @@ export async function DELETE(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const token = req.nextUrl.searchParams.get("token");
+  const token = extractAdminToken(req, slug);
   const playerId = req.nextUrl.searchParams.get("playerId");
 
   if (!playerId) {

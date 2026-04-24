@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { extractAdminToken } from "@/lib/auth-server";
 
 export async function GET(
   _req: NextRequest,
@@ -41,7 +42,7 @@ export async function PATCH(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const token = req.nextUrl.searchParams.get("token");
+  const token = extractAdminToken(req, slug);
 
   const tournament = await prisma.tournament.findUnique({ where: { slug } });
   if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
@@ -67,7 +68,7 @@ export async function PUT(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const token = req.nextUrl.searchParams.get("token");
+  const token = extractAdminToken(req, slug);
 
   const tournament = await prisma.tournament.findUnique({ where: { slug } });
   if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
@@ -91,7 +92,7 @@ export async function DELETE(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const token = req.nextUrl.searchParams.get("token");
+  const token = extractAdminToken(req, slug);
 
   const tournament = await prisma.tournament.findUnique({ where: { slug } });
   if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });

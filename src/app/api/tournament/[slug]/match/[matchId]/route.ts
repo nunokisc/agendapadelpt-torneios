@@ -4,6 +4,8 @@ import { scoreSchema } from "@/lib/validators";
 import { determineMatchWinner, validateScores } from "@/lib/scoring";
 import { generateSingleElimination } from "@/lib/bracket-engine";
 import { computeGroupStandings } from "@/lib/standings";
+import { broadcastUpdate } from "@/lib/sse";
+import { extractAdminToken } from "@/lib/auth-server";
 import type { SetScore, MatchFormat } from "@/types";
 
 export async function PUT(
@@ -11,7 +13,7 @@ export async function PUT(
   { params }: { params: Promise<{ slug: string; matchId: string }> }
 ) {
   const { slug, matchId } = await params;
-  const token = req.nextUrl.searchParams.get("token");
+  const token = extractAdminToken(req, slug);
 
   const tournament = await prisma.tournament.findUnique({ where: { slug } });
   if (!tournament) {
@@ -31,6 +33,26 @@ export async function PUT(
   }
   if (!match.team1Id || !match.team2Id) {
     return NextResponse.json({ error: "Jogo ainda não tem as duas duplas" }, { status: 400 });
+  }
+
+  // Allow re-scoring completed matches — check next match hasn't been completed
+  if (match.status === "completed" && match.nextMatchId) {
+    const nextMatch = await prisma.match.findUnique({ where: { id: match.nextMatchId } });
+    if (nextMatch && nextMatch.status === "completed") {
+      return NextResponse.json(
+        { error: "Não é possível editar: o jogo seguinte já tem resultado" },
+        { status: 400 }
+      );
+    }
+  }
+  if (match.status === "completed" && match.loserNextMatchId) {
+    const loserNext = await prisma.match.findUnique({ where: { id: match.loserNextMatchId } });
+    if (loserNext && loserNext.status === "completed") {
+      return NextResponse.json(
+        { error: "Não é possível editar: o jogo do losers bracket seguinte já tem resultado" },
+        { status: 400 }
+      );
+    }
   }
 
   const body = await req.json();
@@ -102,8 +124,8 @@ export async function PUT(
           const advanceCount = tournament.advanceCount ?? 2;
 
           // Compute standings per group and collect advancing players
-          // Seeding order: G0-1st, G1-1st, ..., G0-2nd, G1-2nd, ...
-          const advancingByPosition: string[][] = Array.from({ length: advanceCount }, () => []);
+          // Cross-group seeding: 1sts interleaved with reversed 2nds to avoid same-group matchups
+          const advancingByPosition: { playerId: string; groupIndex: number }[][] = Array.from({ length: advanceCount }, () => []);
 
           for (let g = 0; g < groupCount; g++) {
             const gMatches = allGroupMatches.filter((m) => m.groupIndex === g);
@@ -115,12 +137,21 @@ export async function PUT(
             }
             const standings = computeGroupStandings(gMatches, playerIds);
             for (let pos = 0; pos < advanceCount; pos++) {
-              if (standings[pos]) advancingByPosition[pos].push(standings[pos].playerId);
+              if (standings[pos]) advancingByPosition[pos].push({ playerId: standings[pos].playerId, groupIndex: g });
             }
           }
 
-          // Flatten: 1sts first, then 2nds, etc.
-          const advancingPlayers = advancingByPosition.flat();
+          // Cross-group interleaving: 1sts in order, 2nds reversed
+          // This ensures G0-1st vs G(last)-2nd, G1-1st vs G(last-1)-2nd, etc.
+          const advancingPlayers: string[] = [];
+          for (let pos = 0; pos < advanceCount; pos++) {
+            const group = advancingByPosition[pos];
+            if (pos % 2 === 0) {
+              advancingPlayers.push(...group.map((g) => g.playerId));
+            } else {
+              advancingPlayers.push(...group.reverse().map((g) => g.playerId));
+            }
+          }
 
           // Generate single elimination knockout bracket
           const knockoutInputs = generateSingleElimination(advancingPlayers.length, false);
@@ -196,6 +227,8 @@ export async function PUT(
 
     return { match: updatedMatch };
   });
+
+  broadcastUpdate(tournament.id, "match_updated", { matchId, slug });
 
   return NextResponse.json(result);
 }

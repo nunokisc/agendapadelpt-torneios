@@ -18,12 +18,33 @@ export default function GroupStageView({ matches, players, isAdmin, onMatchClick
   const knockoutMatches = matches.filter((m) => m.bracketType === "winners" || m.bracketType === "third_place");
   const hasKnockout = knockoutMatches.length > 0;
 
+  // Check if all group matches are done
+  const allGroupsDone = groupMatches.length > 0 && groupMatches.every(
+    (m) => m.status === "completed" || m.status === "bye"
+  );
+
   const groupLabels = Array.from({ length: groupCount }, (_, g) => `Grupo ${String.fromCharCode(65 + g)}`);
   const mobileTabs = [...groupLabels, ...(hasKnockout ? ["Eliminação"] : [])];
   const [mobileTab, setMobileTab] = useState(0);
 
   return (
     <div className="space-y-8">
+      {/* Transition banner */}
+      {allGroupsDone && hasKnockout && (
+        <div className="rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 px-4 py-3 text-center">
+          <p className="text-blue-700 dark:text-blue-400 text-sm font-medium">
+            ✅ Fase de grupos concluída — Fase de eliminação gerada automaticamente!
+          </p>
+        </div>
+      )}
+      {allGroupsDone && !hasKnockout && (
+        <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 px-4 py-3 text-center">
+          <p className="text-amber-700 dark:text-amber-400 text-sm font-medium">
+            ⏳ Fase de grupos concluída — A gerar fase de eliminação…
+          </p>
+        </div>
+      )}
+
       {/* ── Mobile: tabs per group + knockout ── */}
       <div className="sm:hidden space-y-4">
         <div className="flex gap-1.5 overflow-x-auto pb-1 border-b border-slate-200 dark:border-slate-700">

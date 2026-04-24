@@ -6,13 +6,15 @@ import {
   generateGroupsKnockout,
   generateDoubleElimination,
 } from "@/lib/bracket-engine";
+import { broadcastUpdate } from "@/lib/sse";
+import { extractAdminToken } from "@/lib/auth-server";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const token = req.nextUrl.searchParams.get("token");
+  const token = extractAdminToken(req, slug);
 
   const tournament = await prisma.tournament.findUnique({
     where: { slug },
@@ -119,6 +121,8 @@ export async function POST(
 
     return created;
   });
+
+  broadcastUpdate(tournament.id, "bracket_generated", { slug });
 
   return NextResponse.json({ matches }, { status: 201 });
 }

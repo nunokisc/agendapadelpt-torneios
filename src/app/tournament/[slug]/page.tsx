@@ -5,6 +5,9 @@ import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import TournamentBottomNav from "@/components/layout/TournamentBottomNav";
 import TournamentHeader from "@/components/tournament/TournamentHeader";
+import { useTournamentSSE } from "@/lib/use-tournament-sse";
+import { getAdminToken } from "@/lib/auth";
+import { usePushNotifications } from "@/lib/use-push-notifications";
 import PlayerList from "@/components/tournament/PlayerList";
 import LinkShare from "@/components/tournament/LinkShare";
 import ScheduleManager from "@/components/tournament/ScheduleManager";
@@ -71,13 +74,25 @@ function IconStats() {
 export default function TournamentPage() {
   const { slug } = useParams<{ slug: string }>();
   const searchParams = useSearchParams();
-  const token = searchParams.get("token") ?? "";
+  // Token can come from query param (first visit) or cookie (subsequent visits via middleware redirect)
+  const queryToken = searchParams.get("token") ?? "";
+  const [token, setToken] = useState(queryToken);
+  
+  useEffect(() => {
+    if (!queryToken) {
+      const cookieToken = getAdminToken(slug);
+      if (cookieToken) setToken(cookieToken);
+    }
+  }, [slug, queryToken]);
+  
   const isAdmin = Boolean(token);
 
   const { toast } = useToast();
+  const pushNotifs = usePushNotifications(slug);
   const [data, setData] = useState<TournamentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [activeTab, setActiveTab] = useState<"bracket" | "schedule" | "registrations">("bracket");
@@ -97,11 +112,8 @@ export default function TournamentPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  useEffect(() => {
-    if (isAdmin) return;
-    const interval = setInterval(fetchData, 30_000);
-    return () => clearInterval(interval);
-  }, [isAdmin, fetchData]);
+  // Real-time updates via SSE (replaces 30s polling)
+  useTournamentSSE(slug, fetchData, !isAdmin);
 
   async function handleGenerate() {
     setGenerating(true);
@@ -121,10 +133,30 @@ export default function TournamentPage() {
     }
   }
 
+  async function handleReset() {
+    if (!confirm("Tens a certeza? Todos os resultados e jogos serão eliminados. Os jogadores e seeds mantêm-se.")) return;
+    setResetting(true);
+    setApiError(null);
+    try {
+      const res = await fetch(`/api/tournament/${slug}/reset?token=${token}`, { method: "POST" });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error ?? "Erro ao repor");
+      }
+      await fetchData();
+      toast("Bracket eliminado. Torneio em modo rascunho.");
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Erro desconhecido");
+    } finally {
+      setResetting(false);
+    }
+  }
+
   function handleMatchClick(match: Match) {
     if (!isAdmin) return;
     if (match.status === "bye") return;
     if (!match.team1Id || !match.team2Id) return;
+    // Allow clicking completed matches for re-scoring
     setSelectedMatch(match);
   }
 
@@ -192,6 +224,21 @@ export default function TournamentPage() {
             <IconPerson />
             Os meus jogos
           </Link>
+          {pushNotifs.supported && (
+            <button
+              onClick={() => pushNotifs.subscribed ? pushNotifs.unsubscribe() : pushNotifs.subscribe()}
+              className={`flex items-center gap-1 transition-colors ${
+                pushNotifs.subscribed
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400"
+              }`}
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill={pushNotifs.subscribed ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" />
+              </svg>
+              {pushNotifs.subscribed ? "Notificações ativas" : "Ativar notificações"}
+            </button>
+          )}
         </div>
       )}
       {!isAdmin && isDraft && tournament.registrationOpen && (
@@ -261,6 +308,15 @@ export default function TournamentPage() {
                   {label}
                 </button>
               ))}
+              <div className="ml-auto flex items-center">
+                <button
+                  onClick={handleReset}
+                  disabled={resetting}
+                  className="px-3 py-1.5 text-xs font-medium text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {resetting ? "A repor…" : "Repor Bracket"}
+                </button>
+              </div>
             </div>
           )}
 
@@ -274,7 +330,25 @@ export default function TournamentPage() {
               </div>
               <div className="xl:col-span-3">
                 <Card padding="md">
-                  <div className="flex items-center justify-end mb-3">
+                  <div className="flex items-center justify-end gap-3 mb-3">
+                    <div className="flex items-center gap-2 mr-auto">
+                      <a
+                        href={`/api/tournament/${slug}/export?format=csv`}
+                        download
+                        className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                      >
+                        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        CSV
+                      </a>
+                      <a
+                        href={`/api/tournament/${slug}/export?format=ical`}
+                        download
+                        className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                      >
+                        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18" /></svg>
+                        iCal
+                      </a>
+                    </div>
                     <a
                       href={bracketUrl}
                       target="_blank"

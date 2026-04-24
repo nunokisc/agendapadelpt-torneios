@@ -37,7 +37,18 @@ interface Tournament {
   groupCount: number | null;
   advanceCount: number | null;
   createdAt: string;
-  _count: { players: number; matches: number };
+  _count: { players: number; matches: number; registrations: number };
+  matchesCompleted: number;
+  matchesPending: number;
+}
+
+interface PlatformStats {
+  totalTournaments: number;
+  totalMatches: number;
+  completedMatches: number;
+  pendingMatches: number;
+  pendingRegistrations: number;
+  byStatus: { draft: number; in_progress: number; completed: number };
 }
 
 function AdminPage() {
@@ -47,6 +58,7 @@ function AdminPage() {
   const [token, setToken] = useState(searchParams.get("token") ?? "");
   const [input, setInput] = useState(searchParams.get("token") ?? "");
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -63,6 +75,7 @@ function AdminPage() {
       }
       const data = await res.json();
       setTournaments(data.tournaments ?? []);
+      if (data.stats) setPlatformStats(data.stats);
     } catch {
       setError("Erro ao carregar torneios.");
     } finally {
@@ -124,11 +137,16 @@ function AdminPage() {
 
   // ── Dashboard ─────────────────────────────────────────────────────────────
   const total = tournaments.length;
-  const byStatus = {
+  const byStatus = platformStats?.byStatus ?? {
     draft: tournaments.filter((t) => t.status === "draft").length,
     in_progress: tournaments.filter((t) => t.status === "in_progress").length,
     completed: tournaments.filter((t) => t.status === "completed").length,
   };
+
+  // Tournaments that need admin attention
+  const needsAction = tournaments.filter(
+    (t) => t.status === "in_progress" && t.matchesPending > 0
+  ).sort((a, b) => b.matchesPending - a.matchesPending);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -154,12 +172,14 @@ function AdminPage() {
 
       <div className="mx-auto max-w-6xl px-4 py-6 space-y-6">
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
             { label: "Total", value: total, color: "text-slate-700 dark:text-slate-200" },
             { label: "Rascunho", value: byStatus.draft, color: "text-slate-500" },
             { label: "Em curso", value: byStatus.in_progress, color: "text-blue-600 dark:text-blue-400" },
             { label: "Concluídos", value: byStatus.completed, color: "text-emerald-600 dark:text-emerald-400" },
+            { label: "Jogos feitos", value: platformStats?.completedMatches ?? "-", color: "text-emerald-600 dark:text-emerald-400" },
+            { label: "Jogos pendentes", value: platformStats?.pendingMatches ?? "-", color: "text-amber-600 dark:text-amber-400" },
           ].map((s) => (
             <div
               key={s.label}
@@ -170,6 +190,34 @@ function AdminPage() {
             </div>
           ))}
         </div>
+
+        {/* Needs action */}
+        {needsAction.length > 0 && (
+          <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-4">
+            <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-2">
+              ⚡ Torneios com jogos por preencher
+            </h3>
+            <div className="space-y-1.5">
+              {needsAction.slice(0, 5).map((t) => (
+                <div key={t.id} className="flex items-center justify-between text-sm">
+                  <span className="text-slate-700 dark:text-slate-300 truncate max-w-[200px]">{t.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-amber-600 dark:text-amber-400 font-mono">
+                      {t.matchesPending} pendente{t.matchesPending !== 1 ? "s" : ""}
+                    </span>
+                    <Link
+                      href={`/tournament/${t.slug}?token=${t.adminToken}`}
+                      target="_blank"
+                      className="text-xs px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-700 text-white font-medium transition-colors"
+                    >
+                      Ir
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Search + Table */}
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">

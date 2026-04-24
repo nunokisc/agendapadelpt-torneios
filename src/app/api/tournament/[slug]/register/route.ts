@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { extractAdminToken } from "@/lib/auth-server";
 
 const registerSchema = z.object({
   player1: z.string().min(1).max(60),
@@ -46,7 +47,7 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const token = req.nextUrl.searchParams.get("token");
+  const token = extractAdminToken(req, slug);
 
   const tournament = await prisma.tournament.findUnique({ where: { slug } });
   if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
@@ -66,7 +67,7 @@ export async function PATCH(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const token = req.nextUrl.searchParams.get("token");
+  const token = extractAdminToken(req, slug);
 
   const tournament = await prisma.tournament.findUnique({ where: { slug } });
   if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
