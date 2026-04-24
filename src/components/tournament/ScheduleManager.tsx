@@ -13,6 +13,14 @@ interface Props {
   onUpdate: () => void;
 }
 
+type DayWindow = { date: string; startTime: string; endTime: string };
+
+function todayStr() {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 function fmt(date: Date | string | null) {
   if (!date) return "";
   return new Date(date).toLocaleString("pt-PT", {
@@ -36,13 +44,31 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
 
   // Auto-schedule form
   const [showAuto, setShowAuto] = useState(false);
-  const [startTime, setStartTime] = useState(() => {
-    const d = new Date();
-    d.setMinutes(0, 0, 0);
-    return toInputValue(d);
-  });
+  const [days, setDays] = useState<DayWindow[]>([
+    { date: todayStr(), startTime: "09:00", endTime: "18:00" },
+  ]);
   const [minutesPerMatch, setMinutesPerMatch] = useState(90);
   const [autoLoading, setAutoLoading] = useState(false);
+
+  function addDay() {
+    setDays((prev) => {
+      const last = prev[prev.length - 1];
+      // Suggest the day after the last one
+      const next = new Date(last.date + "T12:00:00");
+      next.setDate(next.getDate() + 1);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const nextDate = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`;
+      return [...prev, { date: nextDate, startTime: last.startTime, endTime: last.endTime }];
+    });
+  }
+
+  function removeDay(i: number) {
+    setDays((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  function updateDay(i: number, field: keyof DayWindow, value: string) {
+    setDays((prev) => prev.map((d, idx) => idx === i ? { ...d, [field]: value } : d));
+  }
 
   const playable = matches.filter((m) => m.status !== "bye");
 
@@ -81,10 +107,7 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
       const res = await fetch(`/api/tournament/${tournament.slug}/schedule?token=${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          startTime: new Date(startTime).toISOString(),
-          minutesPerMatch,
-        }),
+        body: JSON.stringify({ days, minutesPerMatch }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
       const data = await res.json();
@@ -120,30 +143,73 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
       {showAuto && (
         <div className="mb-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
           <p className="text-xs text-slate-500">
-            Distribui todos os jogos pelos {courts} campo{courts !== 1 ? "s" : ""} por ronda.
+            Distribui todos os jogos pelos {courts} campo{courts !== 1 ? "s" : ""} pelas janelas horárias definidas.
           </p>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs text-slate-500 font-medium">Início</label>
-              <input
-                type="datetime-local"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-slate-500 font-medium">Minutos por jogo</label>
-              <input
-                type="number"
-                min={15}
-                max={240}
-                value={minutesPerMatch}
-                onChange={(e) => setMinutesPerMatch(Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
+
+          <div className="space-y-2">
+            {days.map((day, i) => (
+              <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] gap-1.5 items-end">
+                <div>
+                  {i === 0 && <label className="block text-[10px] text-slate-400 mb-0.5">Data</label>}
+                  <input
+                    type="date"
+                    value={day.date}
+                    onChange={(e) => updateDay(i, "date", e.target.value)}
+                    className="w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  {i === 0 && <label className="block text-[10px] text-slate-400 mb-0.5">Início</label>}
+                  <input
+                    type="time"
+                    value={day.startTime}
+                    onChange={(e) => updateDay(i, "startTime", e.target.value)}
+                    className="w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  {i === 0 && <label className="block text-[10px] text-slate-400 mb-0.5">Fim</label>}
+                  <input
+                    type="time"
+                    value={day.endTime}
+                    onChange={(e) => updateDay(i, "endTime", e.target.value)}
+                    className="w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+                <div className={i === 0 ? "pt-4" : ""}>
+                  {days.length > 1 && (
+                    <button
+                      onClick={() => removeDay(i)}
+                      className="text-slate-400 hover:text-red-500 transition-colors text-sm px-1"
+                      title="Remover dia"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
+
+          <button
+            onClick={addDay}
+            className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline"
+          >
+            + Adicionar dia
+          </button>
+
+          <div>
+            <label className="text-xs text-slate-500 font-medium">Minutos por jogo</label>
+            <input
+              type="number"
+              min={15}
+              max={240}
+              value={minutesPerMatch}
+              onChange={(e) => setMinutesPerMatch(Number(e.target.value))}
+              className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
           <Button size="sm" loading={autoLoading} onClick={autoSchedule} className="w-full">
             Gerar agenda
           </Button>

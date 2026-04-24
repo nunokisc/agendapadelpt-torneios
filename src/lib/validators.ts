@@ -13,6 +13,7 @@ export const createTournamentSchema = z.object({
   thirdPlace: z.boolean().optional().default(false),
   groupCount: z.number().int().min(2).max(8).optional(),
   advanceCount: z.number().int().min(1).max(4).optional(),
+  courtCount: z.number().int().min(1).max(99).optional().default(1),
 });
 
 export const addTeamSchema = z.object({

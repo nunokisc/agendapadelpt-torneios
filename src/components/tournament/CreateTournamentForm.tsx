@@ -54,6 +54,7 @@ export default function CreateTournamentForm() {
   const [thirdPlace, setThirdPlace] = useState(false);
   const [groupCount, setGroupCount] = useState(2);
   const [advanceCount, setAdvanceCount] = useState(2);
+  const [courtCount, setCourtCount] = useState<string>("");
 
   const isGroups = format === "groups_knockout";
   const isSingle = format === "single_elimination";
@@ -74,6 +75,7 @@ export default function CreateTournamentForm() {
         format,
         matchFormat,
         thirdPlace: isSingle ? thirdPlace : false,
+        courtCount: courtCount !== "" ? Number(courtCount) : 1,
       };
       if (isGroups) {
         body.groupCount = groupCount;
@@ -186,6 +188,16 @@ export default function CreateTournamentForm() {
             />
           </div>
         )}
+
+        <Input
+          label="Número de campos"
+          type="number"
+          min={1}
+          max={99}
+          placeholder="1"
+          value={courtCount}
+          onChange={(e) => setCourtCount(e.target.value)}
+        />
 
         {error && (
           <p className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
