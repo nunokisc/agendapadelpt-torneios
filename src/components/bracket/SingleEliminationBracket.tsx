@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import MatchCard from "./MatchCard";
 import BracketConnector from "./BracketConnector";
 import type { Match } from "@/types";
@@ -26,6 +26,7 @@ function getRoundName(round: number, totalRounds: number): string {
 }
 
 export default function SingleEliminationBracket({ matches, isAdmin, onMatchClick }: Props) {
+  const [mobileRound, setMobileRound] = useState(1);
   const { rounds, positions, svgConnectors, totalWidth, totalHeight } = useMemo(() => {
     const winners = matches.filter((m) => m.bracketType === "winners");
     const thirdPlace = matches.filter((m) => m.bracketType === "third_place");
@@ -152,8 +153,64 @@ export default function SingleEliminationBracket({ matches, isAdmin, onMatchClic
 
   const maxRound = Math.max(...winners.map((m) => m.round));
 
+  // Mobile view: round tabs + list of matches for selected round
+  const allRoundNums = Array.from(new Set([...winners, ...thirdPlace].map((m) => m.round))).sort((a, b) => a - b);
+  const mobileRoundMatches = matches.filter((m) => m.round === mobileRound && m.status !== "bye");
+  const hasMobileRound = mobileRoundMatches.length > 0;
+
   return (
-    <div className="overflow-x-auto pb-4">
+    <>
+    {/* Mobile view */}
+    <div className="sm:hidden">
+      {/* Round tabs */}
+      <div className="flex gap-1 overflow-x-auto pb-1 mb-4 border-b border-slate-200 dark:border-slate-700">
+        {allRoundNums.map((r) => {
+          const isThird = thirdPlace.some((m) => m.round === r);
+          const label = isThird ? "3º/4º" : getRoundName(r, maxRound);
+          return (
+            <button
+              key={r}
+              onClick={() => setMobileRound(r)}
+              className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                mobileRound === r
+                  ? "bg-emerald-600 text-white"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Matches list for selected round */}
+      {!hasMobileRound ? (
+        <p className="text-center text-sm text-slate-400 py-8">Nenhum jogo nesta ronda.</p>
+      ) : (
+        <div className="space-y-3">
+          {mobileRoundMatches.map((m) => (
+            <div key={m.id} className="flex flex-col gap-1">
+              {m.scheduledAt || m.court ? (
+                <p className="text-xs text-slate-400 px-1">
+                  {m.court && <span className="font-medium text-slate-500">{m.court}</span>}
+                  {m.court && m.scheduledAt && " · "}
+                  {m.scheduledAt && new Date(m.scheduledAt).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}
+                </p>
+              ) : null}
+              <MatchCard
+                match={m}
+                isAdmin={isAdmin}
+                onClick={() => onMatchClick(m)}
+                highlight={winnerPathIds.has(m.id)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+    {/* Desktop view */}
+    <div className="hidden sm:block overflow-x-auto pb-4">
       {/* Round headers */}
       <div className="flex mb-3" style={{ minWidth: totalWidth }}>
         {rounds.map((r) => (
@@ -209,5 +266,6 @@ export default function SingleEliminationBracket({ matches, isAdmin, onMatchClic
         })}
       </div>
     </div>
+    </>
   );
 }

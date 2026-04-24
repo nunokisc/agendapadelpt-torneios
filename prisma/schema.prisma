@@ -18,11 +18,15 @@ model Tournament {
   thirdPlace  Boolean  @default(false)
   groupCount  Int?
   advanceCount Int?
+  isPublic         Boolean @default(false)
+  registrationOpen Boolean @default(false)
+  courtCount       Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  players Player[]
-  matches Match[]
+  players       Player[]
+  matches       Match[]
+  registrations Registration[]
 }
 
 model Player {
@@ -58,6 +62,8 @@ model Match {
   winner        Player? @relation("Winner", fields: [winnerId], references: [id])
 
   scores        String?
+  scheduledAt   DateTime?
+  court         String?
 
   status        String  @default("pending")
 
@@ -68,4 +74,16 @@ model Match {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Registration {
+  id           String   @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  player1Name  String
+  player2Name  String
+  teamName     String?
+  contact      String?
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
 }

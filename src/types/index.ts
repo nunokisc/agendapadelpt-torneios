@@ -36,10 +36,24 @@ export interface Tournament {
   thirdPlace: boolean;
   groupCount: number | null;
   advanceCount: number | null;
+  courtCount: number | null;
+  isPublic: boolean;
+  registrationOpen: boolean;
   createdAt: Date;
   updatedAt: Date;
   players?: Player[];
   matches?: Match[];
+}
+
+export interface Registration {
+  id: string;
+  tournamentId: string;
+  player1Name: string;
+  player2Name: string;
+  teamName: string | null;
+  contact: string | null;
+  status: "pending" | "approved" | "rejected";
+  createdAt: Date;
 }
 
 export interface Player {
@@ -66,6 +80,8 @@ export interface Match {
   winnerId: string | null;
   winner?: Player | null;
   scores: string | null;
+  scheduledAt: Date | null;
+  court: string | null;
   status: MatchStatus;
   nextMatchId: string | null;
   nextMatchSlot: number | null;
