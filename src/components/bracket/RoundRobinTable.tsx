@@ -103,8 +103,8 @@ export default function RoundRobinTable({ matches, players, isAdmin, onMatchClic
               <th className="py-2 px-2 text-center">D</th>
               <th className="py-2 px-2 text-center">S+</th>
               <th className="py-2 px-2 text-center">S-</th>
-              <th className="py-2 px-2 text-center">J+</th>
-              <th className="py-2 px-2 text-center">J-</th>
+              <th className="py-2 px-2 text-center hidden sm:table-cell">J+</th>
+              <th className="py-2 px-2 text-center hidden sm:table-cell">J-</th>
             </tr>
           </thead>
           <tbody>
@@ -121,8 +121,8 @@ export default function RoundRobinTable({ matches, players, isAdmin, onMatchClic
                 <td className="py-2 px-2 text-center text-red-500">{s.losses}</td>
                 <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{s.setsFor}</td>
                 <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{s.setsAgainst}</td>
-                <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{s.gamesFor}</td>
-                <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{s.gamesAgainst}</td>
+                <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400 hidden sm:table-cell">{s.gamesFor}</td>
+                <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400 hidden sm:table-cell">{s.gamesAgainst}</td>
               </tr>
             ))}
           </tbody>

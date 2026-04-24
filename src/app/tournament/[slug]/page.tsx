@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import TournamentBottomNav from "@/components/layout/TournamentBottomNav";
 import TournamentHeader from "@/components/tournament/TournamentHeader";
 import PlayerList from "@/components/tournament/PlayerList";
 import LinkShare from "@/components/tournament/LinkShare";
@@ -22,6 +23,50 @@ import type { Tournament, Player, Match } from "@/types";
 interface TournamentData {
   tournament: Tournament & { players: Player[]; matches: Match[] };
 }
+
+// ── Bottom nav icons ──────────────────────────────────────────────────────────
+
+function IconBracket() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="2" y="3" width="6" height="4" rx="1" /><rect x="16" y="3" width="6" height="4" rx="1" />
+      <rect x="9" y="10" width="6" height="4" rx="1" /><rect x="9" y="17" width="6" height="4" rx="1" />
+      <path strokeLinecap="round" d="M5 7v3.5a.5.5 0 00.5.5H9M19 7v3.5a.5.5 0 01-.5.5H15" />
+      <path strokeLinecap="round" d="M12 14v3" />
+    </svg>
+  );
+}
+function IconCalendar() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="4" width="18" height="18" rx="2" /><path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  );
+}
+function IconUsers() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path strokeLinecap="round" d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
+      <path strokeLinecap="round" d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+    </svg>
+  );
+}
+function IconPerson() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="8" r="4" /><path strokeLinecap="round" d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+    </svg>
+  );
+}
+function IconStats() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+    </svg>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function TournamentPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -121,26 +166,39 @@ export default function TournamentPage() {
     return null;
   }
 
+  // ── Bottom nav config ────────────────────────────────────────────────────────
+  const showBottomNav = !isDraft;
+
+  const adminNavItems = [
+    { key: "bracket" as const, label: "Bracket", icon: <IconBracket /> },
+    { key: "schedule" as const, label: "Agenda", icon: <IconCalendar /> },
+    { key: "registrations" as const, label: "Inscrições", icon: <IconUsers /> },
+  ];
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:pb-8">
       <TournamentHeader tournament={tournament} isAdmin={isAdmin} onUpdate={fetchData} />
 
       {isAdmin && <LinkShare slug={slug} adminToken={token} />}
 
-      {/* Public links (non-admin) */}
-      {!isAdmin && (
-        <div className="flex items-center gap-4 mb-4 text-sm">
+      {/* Public quick links — hidden on mobile (bottom nav covers this) */}
+      {!isAdmin && !isDraft && (
+        <div className="hidden sm:flex items-center gap-4 mb-4 text-sm">
           <Link href={`/tournament/${slug}/stats`} className="text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1">
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
+            <IconStats />
             Estatísticas
           </Link>
-          {tournament.registrationOpen && isDraft && (
-            <Link href={`/tournament/${slug}/register`} className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1">
-              Inscrever dupla →
-            </Link>
-          )}
+          <Link href={`/tournament/${slug}/minha-dupla`} className="text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1">
+            <IconPerson />
+            Os meus jogos
+          </Link>
+        </div>
+      )}
+      {!isAdmin && isDraft && tournament.registrationOpen && (
+        <div className="flex items-center gap-4 mb-4 text-sm">
+          <Link href={`/tournament/${slug}/register`} className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1">
+            Inscrever dupla →
+          </Link>
         </div>
       )}
 
@@ -149,11 +207,9 @@ export default function TournamentPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1 space-y-4">
             <PlayerList players={tournament.players} slug={slug} token={token} onUpdate={fetchData} disabled={!isAdmin} />
-
             {isAdmin && tournament.registrationOpen && (
               <RegistrationPanel slug={slug} token={token} onApproved={fetchData} />
             )}
-
             {isAdmin && (
               <>
                 {apiError && <p className="text-sm text-red-600 dark:text-red-400">{apiError}</p>}
@@ -164,7 +220,6 @@ export default function TournamentPage() {
               </>
             )}
           </div>
-
           <div className="lg:col-span-2">
             <div className="flex items-center justify-center h-64 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700">
               <div className="text-center text-slate-400">
@@ -190,43 +245,36 @@ export default function TournamentPage() {
             </div>
           )}
 
-          {/* Tabs (admin only) */}
+          {/* Desktop tabs (admin only) */}
           {isAdmin && (
-            <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700">
-              {(["bracket", "schedule", "registrations"] as const).map((tab) => {
-                const labels = { bracket: "Bracket", schedule: "Agenda", registrations: "Inscrições" };
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                      activeTab === tab
-                        ? "border-emerald-600 text-emerald-600 dark:text-emerald-400 dark:border-emerald-400"
-                        : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                    }`}
-                  >
-                    {labels[tab]}
-                  </button>
-                );
-              })}
+            <div className="hidden sm:flex gap-1 border-b border-slate-200 dark:border-slate-700">
+              {adminNavItems.map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                    activeTab === key
+                      ? "border-emerald-600 text-emerald-600 dark:text-emerald-400 dark:border-emerald-400"
+                      : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           )}
 
           {(!isAdmin || activeTab === "bracket") && (
             <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-              <div className="xl:col-span-1 space-y-3">
+              <div className="xl:col-span-1 space-y-3 hidden xl:block">
                 <PlayerList players={tournament.players} slug={slug} token={token} onUpdate={fetchData} disabled />
-                <Link
-                  href={`/tournament/${slug}/stats`}
-                  className="block text-center text-xs text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors py-2"
-                >
+                <Link href={`/tournament/${slug}/stats`} className="block text-center text-xs text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors py-2">
                   Ver estatísticas →
                 </Link>
               </div>
-
               <div className="xl:col-span-3">
                 <Card padding="md">
-                  <div className="flex items-center justify-end mb-3 gap-3">
+                  <div className="flex items-center justify-end mb-3">
                     <a
                       href={bracketUrl}
                       target="_blank"
@@ -248,7 +296,6 @@ export default function TournamentPage() {
           {isAdmin && activeTab === "schedule" && (
             <ScheduleManager tournament={tournament} matches={tournament.matches} token={token} onUpdate={fetchData} />
           )}
-
           {isAdmin && activeTab === "registrations" && (
             <RegistrationPanel slug={slug} token={token} onApproved={fetchData} />
           )}
@@ -263,6 +310,32 @@ export default function TournamentPage() {
         onClose={() => setSelectedMatch(null)}
         onSaved={fetchData}
       />
+
+      {/* ── Mobile bottom nav ──────────────────────────────────────────────── */}
+      {showBottomNav && (
+        <>
+          {isAdmin ? (
+            <nav className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex safe-bottom">
+              {adminNavItems.map(({ key, label, icon }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
+                    activeTab === key
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-slate-400 dark:text-slate-500"
+                  }`}
+                >
+                  {icon}
+                  {label}
+                </button>
+              ))}
+            </nav>
+          ) : (
+            <TournamentBottomNav slug={slug} />
+          )}
+        </>
+      )}
     </div>
   );
 }

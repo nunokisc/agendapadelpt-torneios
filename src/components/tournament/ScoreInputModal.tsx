@@ -29,10 +29,52 @@ function emptySet(isSuperTiebreak: boolean): SetScore {
 
 function buildInitialSets(format: MatchFormat): SetScore[] {
   const structure = getFormatStructure(format);
-  // Show only the first non-conditional sets initially
-  const nonConditional = structure.filter((s) => !s.conditional);
-  return nonConditional.map((s) => emptySet(s.type === "superTiebreak"));
+  return structure.filter((s) => !s.conditional).map((s) => emptySet(s.type === "superTiebreak"));
 }
+
+// ── +/− stepper ───────────────────────────────────────────────────────────────
+
+function Stepper({
+  value,
+  onChange,
+  max = 99,
+  winner,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  max?: number;
+  winner?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-center gap-2">
+      <button
+        type="button"
+        onClick={() => onChange(Math.max(0, value - 1))}
+        className="h-11 w-11 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xl font-bold text-slate-500 dark:text-slate-400 active:scale-95 transition-transform touch-manipulation select-none"
+        aria-label="Diminuir"
+      >
+        −
+      </button>
+      <span
+        className={`w-10 text-center text-2xl font-bold font-mono tabular-nums select-none ${
+          winner ? "text-emerald-600 dark:text-emerald-400" : "text-slate-800 dark:text-slate-100"
+        }`}
+      >
+        {value}
+      </span>
+      <button
+        type="button"
+        onClick={() => onChange(Math.min(max, value + 1))}
+        className="h-11 w-11 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xl font-bold text-slate-500 dark:text-slate-400 active:scale-95 transition-transform touch-manipulation select-none"
+        aria-label="Aumentar"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+// ── Main modal ────────────────────────────────────────────────────────────────
 
 export default function ScoreInputModal({ match, slug, token, matchFormat, onClose, onSaved }: Props) {
   const format = (matchFormat || "B1") as MatchFormat;
@@ -43,7 +85,6 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset sets when match changes or format changes
   useEffect(() => {
     if (!match) return;
     if (match.scores) {
@@ -64,7 +105,6 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
   const team1Name = match.team1?.name ?? "Dupla A";
   const team2Name = match.team2?.name ?? "Dupla B";
 
-  // Determine set winners for display
   const setWinners = sets.map((set, i) => {
     const struct = structure[Math.min(i, structure.length - 1)];
     const isSTBSlot =
@@ -77,11 +117,9 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
 
   const t1Sets = setWinners.filter((w) => w === 1).length;
   const t2Sets = setWinners.filter((w) => w === 2).length;
-
   const matchWinner = determineMatchWinner(sets, format);
   const winnerName = matchWinner === 1 ? team1Name : matchWinner === 2 ? team2Name : null;
 
-  // Check if set needs tiebreak inputs
   function needsTiebreak(set: SetScore, idx: number): boolean {
     const struct = structure[Math.min(idx, structure.length - 1)];
     if (struct.type === "superTiebreak") return false;
@@ -92,93 +130,63 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
     return set.team1 === struct.tiebreakAt && set.team2 === struct.tiebreakAt;
   }
 
-  function updateSet(idx: number, field: "team1" | "team2", raw: string) {
-    const val = Math.max(0, parseInt(raw) || 0);
+  function updateSet(idx: number, field: "team1" | "team2", val: number) {
     setSets((prev) =>
       prev.map((s, i) => {
         if (i !== idx) return s;
         const updated = { ...s, [field]: val };
-        // Clear tiebreak if score no longer requires it
         const struct = structure[Math.min(i, structure.length - 1)];
         const tiebreakAt = struct.tiebreakAt ?? (struct.maxGames ?? 6);
-        const newTeam1 = field === "team1" ? val : s.team1;
-        const newTeam2 = field === "team2" ? val : s.team2;
-        if (newTeam1 !== tiebreakAt || newTeam2 !== tiebreakAt) {
-          delete updated.tiebreak;
-        }
+        const newT1 = field === "team1" ? val : s.team1;
+        const newT2 = field === "team2" ? val : s.team2;
+        if (newT1 !== tiebreakAt || newT2 !== tiebreakAt) delete updated.tiebreak;
         return updated;
       })
     );
   }
 
-  function updateTiebreak(idx: number, field: "team1" | "team2", raw: string) {
-    const val = Math.max(0, parseInt(raw) || 0);
+  function updateTiebreak(idx: number, field: "team1" | "team2", val: number) {
     setSets((prev) =>
       prev.map((s, i) => {
         if (i !== idx) return s;
-        return {
-          ...s,
-          tiebreak: { ...(s.tiebreak ?? { team1: 0, team2: 0 }), [field]: val },
-        };
+        return { ...s, tiebreak: { ...(s.tiebreak ?? { team1: 0, team2: 0 }), [field]: val } };
       })
     );
   }
 
-  // Check if we should show a 3rd set option (for B/C/A formats)
   const canAddDecider = (() => {
     if (structure.length < 3) return false;
-    const thirdStruct = structure[2];
-    if (!thirdStruct.conditional) return false;
-    // Show when first two sets are won one each
+    if (!structure[2].conditional) return false;
     return t1Sets === 1 && t2Sets === 1 && sets.length < 3;
   })();
 
-  const thirdStruct = structure[2];
   const isSTBDecider =
-    thirdStruct && (thirdStruct.type === "superTiebreak" ||
-      ((format === "B1" || format === "B2" || format === "C1" || format === "C2") && true));
+    structure[2] &&
+    (structure[2].type === "superTiebreak" ||
+      format === "B1" || format === "B2" || format === "C1" || format === "C2");
 
   function addDecider() {
-    if (isSTBDecider) {
-      setSets((prev) => [...prev, { team1: 0, team2: 0, superTiebreak: true }]);
-    } else {
-      setSets((prev) => [...prev, { team1: 0, team2: 0 }]);
-    }
-  }
-
-  function removeDecider() {
-    setSets((prev) => prev.slice(0, 2));
+    setSets((prev) => [
+      ...prev,
+      isSTBDecider ? { team1: 0, team2: 0, superTiebreak: true } : { team1: 0, team2: 0 },
+    ]);
   }
 
   const validation = validateScores(sets, format);
 
   async function handleSave() {
     setError(null);
-
-    if (!validation.valid) {
-      setError(validation.error ?? "Resultado inválido");
-      return;
-    }
-    if (!matchWinner) {
-      setError("O vencedor ainda não foi determinado.");
-      return;
-    }
-
+    if (!validation.valid) { setError(validation.error ?? "Resultado inválido"); return; }
+    if (!matchWinner) { setError("O vencedor ainda não foi determinado."); return; }
     if (!match) return;
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/tournament/${slug}/match/${match.id}?token=${token}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scores: sets }),
-        }
-      );
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.error ?? "Erro ao guardar resultado");
-      }
+      const res = await fetch(`/api/tournament/${slug}/match/${match.id}?token=${token}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scores: sets }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Erro ao guardar resultado");
       toast("Resultado guardado com sucesso!");
       onSaved();
       onClose();
@@ -190,37 +198,30 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
   }
 
   const roundLabel =
-    match.bracketType === "third_place"
-      ? "3.º / 4.º lugar"
-      : match.bracketType === "final"
-      ? "Grand Final"
-      : `Ronda ${match.round} — Jogo ${match.position + 1}`;
+    match.bracketType === "third_place" ? "3.º / 4.º lugar"
+    : match.bracketType === "final" ? "Grand Final"
+    : `Ronda ${match.round} — Jogo ${match.position + 1}`;
 
   return (
-    <Modal open={!!match} onClose={onClose} title="Introduzir Resultado">
+    <Modal open={!!match} onClose={onClose} title="Resultado">
       <div className="space-y-5">
+        {/* Round / format info */}
         <div>
-          <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">
-            {roundLabel}
-          </p>
+          <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">{roundLabel}</p>
           <p className="text-xs text-slate-400 mt-0.5">
-            Formato: <span className="font-mono font-semibold">{format}</span> — {FORMAT_LABELS[format]}
+            <span className="font-mono font-semibold">{format}</span> — {FORMAT_LABELS[format]}
           </p>
         </div>
 
-        {/* Players header */}
-        <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
-          <div className="text-center font-semibold text-slate-800 dark:text-slate-200 text-sm truncate">
-            {team1Name}
-          </div>
-          <div className="text-slate-400 text-sm font-mono text-center">vs</div>
-          <div className="text-center font-semibold text-slate-800 dark:text-slate-200 text-sm truncate">
-            {team2Name}
-          </div>
+        {/* Team name headers */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
+          <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm leading-tight truncate">{team1Name}</p>
+          <p className="text-slate-400 text-xs font-mono">vs</p>
+          <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm leading-tight truncate">{team2Name}</p>
         </div>
 
         {/* Sets */}
-        <div className="space-y-3">
+        <div className="space-y-4">
           {sets.map((s, idx) => {
             const struct = structure[Math.min(idx, structure.length - 1)];
             const isSTBSlot =
@@ -228,90 +229,67 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
             const isSuperTB = struct.type === "superTiebreak" || isSTBSlot;
             const setWinner = setWinners[idx];
             const showTiebreak = needsTiebreak(s, idx);
-
-            const label = isSuperTB
-              ? "STB"
-              : `Set ${idx + 1}`;
-
-            const target = isSuperTB
-              ? (struct.superTiebreakTarget ?? 10)
-              : (struct.maxGames ?? 6);
+            const maxScore = isSuperTB ? 99 : (struct.maxGames ?? 6) + 2;
+            const label = isSuperTB ? "Super Tie-Break" : `Set ${idx + 1}`;
 
             return (
-              <div key={idx} className="space-y-1.5">
-                {/* Set row label */}
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide w-8 shrink-0">
-                    {label}
-                  </span>
-                  {isSuperTB && (
-                    <span className="text-xs text-slate-400">
-                      (primeiro a {target} com 2 de vantagem)
-                    </span>
-                  )}
-                  {setWinner && (
-                    <span className="ml-auto text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                      {setWinner === 1 ? team1Name : team2Name} vence
-                    </span>
-                  )}
+              <div key={idx} className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 p-3 space-y-2">
+                {/* Set label + winner */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</span>
+                  <div className="flex items-center gap-2">
+                    {setWinner && (
+                      <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                        {setWinner === 1 ? team1Name : team2Name} vence
+                      </span>
+                    )}
+                    {idx === 2 && (
+                      <button
+                        type="button"
+                        onClick={() => setSets((p) => p.slice(0, 2))}
+                        className="text-slate-300 hover:text-red-400 transition-colors"
+                        title="Remover"
+                      >
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                {/* Score inputs */}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    max={isSuperTB ? 99 : target + 2}
+                {/* Steppers */}
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                  <Stepper
                     value={s.team1}
-                    onChange={(e) => updateSet(idx, "team1", e.target.value)}
-                    className={`w-full h-10 rounded-lg border px-3 text-center text-base font-mono font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500
-                      ${setWinner === 1 ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/20" : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"}`}
+                    onChange={(v) => updateSet(idx, "team1", v)}
+                    max={maxScore}
+                    winner={setWinner === 1}
                   />
-                  <span className="text-slate-400 text-sm font-mono shrink-0">—</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={isSuperTB ? 99 : target + 2}
+                  <span className="text-slate-300 dark:text-slate-600 font-mono text-lg select-none">—</span>
+                  <Stepper
                     value={s.team2}
-                    onChange={(e) => updateSet(idx, "team2", e.target.value)}
-                    className={`w-full h-10 rounded-lg border px-3 text-center text-base font-mono font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500
-                      ${setWinner === 2 ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/20" : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"}`}
+                    onChange={(v) => updateSet(idx, "team2", v)}
+                    max={maxScore}
+                    winner={setWinner === 2}
                   />
-                  {/* Remove decider button */}
-                  {idx === 2 && (
-                    <button
-                      onClick={removeDecider}
-                      className="text-slate-300 hover:text-red-400 shrink-0"
-                      title="Remover decididor"
-                    >
-                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
                 </div>
 
-                {/* Tie-break sub-inputs */}
+                {/* Tie-break row */}
                 {showTiebreak && (
-                  <div className="ml-8 flex items-center gap-2">
-                    <span className="text-xs text-slate-400 shrink-0">Tie-break:</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={99}
-                      value={s.tiebreak?.team1 ?? 0}
-                      onChange={(e) => updateTiebreak(idx, "team1", e.target.value)}
-                      className="w-full h-8 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-center text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
-                    <span className="text-slate-400 text-xs font-mono shrink-0">—</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={99}
-                      value={s.tiebreak?.team2 ?? 0}
-                      onChange={(e) => updateTiebreak(idx, "team2", e.target.value)}
-                      className="w-full h-8 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-center text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
+                  <div className="pt-1 border-t border-slate-200 dark:border-slate-700">
+                    <p className="text-xs text-slate-400 mb-1.5">Tie-break</p>
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                      <Stepper
+                        value={s.tiebreak?.team1 ?? 0}
+                        onChange={(v) => updateTiebreak(idx, "team1", v)}
+                      />
+                      <span className="text-slate-300 dark:text-slate-600 font-mono text-lg select-none">—</span>
+                      <Stepper
+                        value={s.tiebreak?.team2 ?? 0}
+                        onChange={(v) => updateTiebreak(idx, "team2", v)}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
@@ -319,11 +297,12 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
           })}
         </div>
 
-        {/* Add decider button */}
+        {/* Add decider */}
         {canAddDecider && (
           <button
+            type="button"
             onClick={addDecider}
-            className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 flex items-center gap-1"
+            className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 transition-colors"
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -332,34 +311,25 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
           </button>
         )}
 
-        {/* Match winner preview */}
+        {/* Winner banner */}
         {winnerName && (
-          <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 px-4 py-2">
+          <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 px-4 py-2.5 text-center">
             <p className="text-sm text-emerald-700 dark:text-emerald-400">
               Vencedor: <strong>{winnerName}</strong>{" "}
-              <span className="font-mono">({t1Sets}–{t2Sets})</span>
+              <span className="font-mono text-xs">({t1Sets}–{t2Sets})</span>
             </p>
           </div>
         )}
 
-        {/* Validation error */}
+        {/* Errors */}
         {!validation.valid && sets.some((s) => s.team1 > 0 || s.team2 > 0) && (
           <p className="text-xs text-amber-600 dark:text-amber-400">{validation.error}</p>
         )}
-
-        {error && (
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         <div className="flex justify-end gap-3 pt-1">
-          <Button variant="secondary" onClick={onClose} disabled={loading}>
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleSave}
-            loading={loading}
-            disabled={!matchWinner || !validation.valid}
-          >
+          <Button variant="secondary" onClick={onClose} disabled={loading}>Cancelar</Button>
+          <Button onClick={handleSave} loading={loading} disabled={!matchWinner || !validation.valid}>
             Guardar
           </Button>
         </div>

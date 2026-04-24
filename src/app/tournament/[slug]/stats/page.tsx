@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
+import TournamentBottomNav from "@/components/layout/TournamentBottomNav";
 import type { Tournament, Player, Match, SetScore } from "@/types";
 
 interface TournamentData {
@@ -85,7 +86,7 @@ export default function StatsPage() {
   const completedMatches = (tournament.matches ?? []).filter((m) => m.status === "completed");
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="mx-auto max-w-4xl px-4 py-8 pb-24 sm:pb-8">
       <div className="mb-6">
         <Link href={`/tournament/${slug}`} className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
           ← {tournament.name}
@@ -155,6 +156,8 @@ export default function StatsPage() {
           </div>
         )}
       </Card>
+
+      <TournamentBottomNav slug={slug} />
     </div>
   );
 }
