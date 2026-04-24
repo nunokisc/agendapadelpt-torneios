@@ -45,6 +45,8 @@ export interface Tournament {
 export interface Player {
   id: string;
   name: string;
+  player1Name: string;
+  player2Name: string;
   seed: number | null;
   tournamentId: string;
   groupIndex: number | null;

@@ -15,9 +15,15 @@ export const createTournamentSchema = z.object({
   advanceCount: z.number().int().min(1).max(4).optional(),
 });
 
+export const addTeamSchema = z.object({
+  player1: z.string().min(1, "Nome do jogador 1 é obrigatório").max(60),
+  player2: z.string().min(1, "Nome do jogador 2 é obrigatório").max(60),
+  teamName: z.string().max(60).optional(),
+});
+
 export const addPlayersSchema = z.union([
-  z.object({ name: z.string().min(1).max(60) }),
-  z.object({ names: z.array(z.string().min(1).max(60)).min(1).max(64) }),
+  addTeamSchema,
+  z.object({ teams: z.array(addTeamSchema).min(1).max(32) }),
 ]);
 
 export const scoreSchema = z.object({

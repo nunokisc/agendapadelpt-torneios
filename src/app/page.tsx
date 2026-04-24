@@ -9,7 +9,7 @@ export default function HomePage() {
           Torneios de Padel
         </h1>
         <p className="mt-3 text-lg text-slate-500 dark:text-slate-400">
-          Cria o teu torneio, adiciona jogadores e gere os brackets — tudo num só lugar.
+          Cria o teu torneio, adiciona as equipas e gere os brackets — tudo num só lugar.
         </p>
       </div>
 

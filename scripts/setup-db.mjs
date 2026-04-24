@@ -9,6 +9,7 @@ const dbPath = resolve(__dirname, "../prisma/dev.db");
 const migrations = [
   { id: "setup-init", name: "20260423195815_init" },
   { id: "setup-scoring", name: "20260423_scoring" },
+  { id: "setup-doubles", name: "20260424_doubles" },
 ];
 
 const db = new Database(dbPath);

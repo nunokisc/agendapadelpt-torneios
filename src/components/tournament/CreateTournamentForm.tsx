@@ -111,7 +111,7 @@ export default function CreateTournamentForm() {
       <CardHeader>
         <CardTitle>Criar novo torneio</CardTitle>
         <p className="text-sm text-slate-500 mt-1">
-          Preenche os detalhes e adiciona os jogadores a seguir.
+          Preenche os detalhes e adiciona as equipas a seguir.
         </p>
       </CardHeader>
 

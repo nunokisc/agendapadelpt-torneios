@@ -50,7 +50,7 @@ export default function MatchCard({ match, isAdmin, onClick, highlight }: MatchC
       >
         <span
           className={cn(
-            "truncate max-w-[130px]",
+            "truncate max-w-[170px]",
             isWinner ? "font-bold text-emerald-700 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300",
             !name && "text-slate-300 dark:text-slate-600 italic"
           )}
@@ -74,7 +74,7 @@ export default function MatchCard({ match, isAdmin, onClick, highlight }: MatchC
   return (
     <div
       className={cn(
-        "w-[220px] rounded-lg border-2 overflow-hidden transition-all select-none",
+        "w-[260px] rounded-lg border-2 overflow-hidden transition-all select-none",
         highlight ? "border-yellow-400 shadow-yellow-200 shadow-md dark:border-yellow-500 dark:shadow-yellow-900/50" : statusBg,
         canEdit && "cursor-pointer hover:border-emerald-400 hover:shadow-md active:scale-95"
       )}

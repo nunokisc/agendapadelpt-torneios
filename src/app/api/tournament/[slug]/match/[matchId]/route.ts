@@ -30,7 +30,7 @@ export async function PUT(
     return NextResponse.json({ error: "Jogo não encontrado" }, { status: 404 });
   }
   if (!match.team1Id || !match.team2Id) {
-    return NextResponse.json({ error: "Jogo ainda não tem os dois jogadores" }, { status: 400 });
+    return NextResponse.json({ error: "Jogo ainda não tem as duas equipas" }, { status: 400 });
   }
 
   const body = await req.json();

@@ -26,31 +26,26 @@ export async function POST(
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
 
-  const names =
-    "names" in parsed.data ? parsed.data.names : [parsed.data.name];
+  const teams =
+    "teams" in parsed.data
+      ? parsed.data.teams
+      : [{ player1: parsed.data.player1, player2: parsed.data.player2, teamName: parsed.data.teamName }];
 
-  const existingPlayers = await prisma.player.findMany({
-    where: { tournamentId: tournament.id },
-    select: { name: true },
-  });
-  const existingNames = new Set(existingPlayers.map((p) => p.name.toLowerCase()));
-
-  const newNames = names
-    .map((n) => n.trim())
-    .filter((n) => n && !existingNames.has(n.toLowerCase()));
-
-  if (newNames.length === 0) {
-    return NextResponse.json({ error: "Nenhum jogador novo para adicionar" }, { status: 400 });
-  }
-
-  const currentCount = existingPlayers.length;
+  const currentCount = await prisma.player.count({ where: { tournamentId: tournament.id } });
 
   const players = await prisma.$transaction(
-    newNames.map((name, i) =>
-      prisma.player.create({
-        data: { name, seed: currentCount + i + 1, tournamentId: tournament.id },
-      })
-    )
+    teams.map((team, i) => {
+      const displayName = team.teamName?.trim() || `${team.player1.trim()} / ${team.player2.trim()}`;
+      return prisma.player.create({
+        data: {
+          name: displayName,
+          player1Name: team.player1.trim(),
+          player2Name: team.player2.trim(),
+          seed: currentCount + i + 1,
+          tournamentId: tournament.id,
+        },
+      });
+    })
   );
 
   return NextResponse.json({ players }, { status: 201 });
@@ -76,7 +71,6 @@ export async function PUT(
   }
 
   const body = await req.json();
-  // body.order = [{id: string, seed: number}]
   const order: { id: string; seed: number }[] = body.order;
   if (!Array.isArray(order)) {
     return NextResponse.json({ error: "order[] é obrigatório" }, { status: 400 });

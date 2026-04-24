@@ -61,8 +61,8 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
 
   if (!match) return null;
 
-  const team1Name = match.team1?.name ?? "Jogador A";
-  const team2Name = match.team2?.name ?? "Jogador B";
+  const team1Name = match.team1?.name ?? "Equipa A";
+  const team2Name = match.team2?.name ?? "Equipa B";
 
   // Determine set winners for display
   const setWinners = sets.map((set, i) => {

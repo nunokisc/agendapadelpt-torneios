@@ -22,7 +22,7 @@ import Input from "@/components/ui/Input";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import type { Player } from "@/types";
 
-// ─── Sortable row ────────────────────────────────────────────────────────────
+// ─── Sortable row ─────────────────────────────────────────────────────────────
 
 function SortablePlayer({
   player,
@@ -44,32 +44,42 @@ function SortablePlayer({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const hasPlayers = player.player1Name && player.player2Name;
+
   return (
     <li
       ref={setNodeRef}
       style={style}
-      className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 group"
+      className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 group"
     >
-      <div className="flex items-center gap-3 min-w-0">
-        {!disabled && (
-          <button
-            {...attributes}
-            {...listeners}
-            className="text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing touch-none shrink-0"
-            tabIndex={-1}
-          >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM16 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM16 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 22a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM16 22a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
-            </svg>
-          </button>
-        )}
-        <span className="text-sm font-mono text-slate-400 w-5 text-right shrink-0">
-          {index + 1}
-        </span>
-        <span className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
+      {!disabled && (
+        <button
+          {...attributes}
+          {...listeners}
+          className="text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing touch-none shrink-0"
+          tabIndex={-1}
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM16 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM16 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 22a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM16 22a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+          </svg>
+        </button>
+      )}
+
+      <span className="text-sm font-mono text-slate-400 w-5 text-right shrink-0">
+        {index + 1}
+      </span>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
           {player.name}
-        </span>
+        </p>
+        {hasPlayers && player.name !== `${player.player1Name} / ${player.player2Name}` && (
+          <p className="text-xs text-slate-400 truncate">
+            {player.player1Name} / {player.player2Name}
+          </p>
+        )}
       </div>
+
       {!disabled && (
         <button
           onClick={onRemove}
@@ -102,9 +112,10 @@ export default function PlayerList({
   onUpdate,
   disabled = false,
 }: PlayerListProps) {
-  const [singleName, setSingleName] = useState("");
-  const [bulkText, setBulkText] = useState("");
-  const [showBulk, setShowBulk] = useState(false);
+  const [player1, setPlayer1] = useState("");
+  const [player2, setPlayer2] = useState("");
+  const [teamName, setTeamName] = useState("");
+  const [showTeamName, setShowTeamName] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,7 +145,6 @@ export default function PlayerList({
     const newIndex = players.findIndex((p) => p.id === over.id);
     const reordered = arrayMove(players, oldIndex, newIndex);
 
-    // Optimistic: parent will re-fetch after saveOrder
     await saveOrder(reordered);
     onUpdate();
   }
@@ -145,11 +155,19 @@ export default function PlayerList({
     onUpdate();
   }
 
-  async function addPlayer(names: string[]) {
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    if (!player1.trim() || !player2.trim()) return;
+
     setError(null);
     setLoading(true);
     try {
-      const body = names.length === 1 ? { name: names[0] } : { names };
+      const body: Record<string, string> = {
+        player1: player1.trim(),
+        player2: player2.trim(),
+      };
+      if (teamName.trim()) body.teamName = teamName.trim();
+
       const res = await fetch(`/api/tournament/${slug}/players?token=${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -157,10 +175,11 @@ export default function PlayerList({
       });
       if (!res.ok) {
         const d = await res.json();
-        throw new Error(d.error ?? "Erro ao adicionar jogador");
+        throw new Error(d.error ?? "Erro ao adicionar equipa");
       }
-      setSingleName("");
-      setBulkText("");
+      setPlayer1("");
+      setPlayer2("");
+      setTeamName("");
       onUpdate();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
@@ -178,7 +197,7 @@ export default function PlayerList({
       );
       if (!res.ok) {
         const d = await res.json();
-        throw new Error(d.error ?? "Erro ao remover jogador");
+        throw new Error(d.error ?? "Erro ao remover equipa");
       }
       onUpdate();
     } catch (err) {
@@ -186,27 +205,19 @@ export default function PlayerList({
     }
   }
 
-  function handleSingleAdd(e: React.FormEvent) {
-    e.preventDefault();
-    if (!singleName.trim()) return;
-    addPlayer([singleName.trim()]);
-  }
-
-  function handleBulkAdd() {
-    const names = bulkText.split("\n").map((n) => n.trim()).filter(Boolean);
-    if (!names.length) return;
-    addPlayer(names);
-  }
+  const canAdd = player1.trim().length > 0 && player2.trim().length > 0;
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Jogadores ({players.length})</CardTitle>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Arrasta para definir seeds. Seed 1 = cabeça de série.
-            </p>
+            <CardTitle>Equipas ({players.length})</CardTitle>
+            {!disabled && (
+              <p className="text-xs text-slate-500 mt-0.5">
+                Arrasta para definir seeds. Seed 1 = cabeça de série.
+              </p>
+            )}
           </div>
           {!disabled && players.length > 1 && (
             <button
@@ -224,68 +235,67 @@ export default function PlayerList({
       </CardHeader>
 
       {!disabled && (
-        <div className="mb-4">
-          <div className="flex gap-1 mb-3 border-b border-slate-100 dark:border-slate-700">
-            <button
-              className={`text-xs px-3 py-2 rounded-t-lg -mb-px transition-colors ${
-                !showBulk
-                  ? "border border-b-white dark:border-slate-600 dark:border-b-slate-900 border-slate-200 text-emerald-600 bg-white dark:bg-slate-900"
-                  : "text-slate-400 hover:text-slate-600"
-              }`}
-              onClick={() => setShowBulk(false)}
-            >
-              Adicionar um
-            </button>
-            <button
-              className={`text-xs px-3 py-2 rounded-t-lg -mb-px transition-colors ${
-                showBulk
-                  ? "border border-b-white dark:border-slate-600 dark:border-b-slate-900 border-slate-200 text-emerald-600 bg-white dark:bg-slate-900"
-                  : "text-slate-400 hover:text-slate-600"
-              }`}
-              onClick={() => setShowBulk(true)}
-            >
-              Colar vários
-            </button>
+        <form onSubmit={handleAdd} className="mb-4 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <Input
+              placeholder="Jogador 1"
+              value={player1}
+              onChange={(e) => setPlayer1(e.target.value)}
+              disabled={loading}
+            />
+            <Input
+              placeholder="Jogador 2"
+              value={player2}
+              onChange={(e) => setPlayer2(e.target.value)}
+              disabled={loading}
+            />
           </div>
 
-          {!showBulk ? (
-            <form onSubmit={handleSingleAdd} className="flex gap-2">
+          {showTeamName ? (
+            <div className="flex gap-2 items-center">
               <Input
-                placeholder="Nome do jogador"
-                value={singleName}
-                onChange={(e) => setSingleName(e.target.value)}
+                placeholder="Nome da equipa (opcional)"
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                disabled={loading}
                 className="flex-1"
-                disabled={loading}
               />
-              <Button type="submit" loading={loading} disabled={!singleName.trim()}>
-                Adicionar
-              </Button>
-            </form>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <textarea
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 resize-none"
-                rows={5}
-                placeholder={"Alice\nBob\nCarlos\nDiana"}
-                value={bulkText}
-                onChange={(e) => setBulkText(e.target.value)}
-                disabled={loading}
-              />
-              <Button onClick={handleBulkAdd} loading={loading} disabled={!bulkText.trim()}>
-                Adicionar todos
-              </Button>
+              <button
+                type="button"
+                onClick={() => { setShowTeamName(false); setTeamName(""); }}
+                className="text-slate-400 hover:text-slate-600 text-xs shrink-0"
+              >
+                Remover
+              </button>
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowTeamName(true)}
+              className="text-xs text-slate-400 hover:text-emerald-600 transition-colors"
+            >
+              + Adicionar nome de equipa
+            </button>
           )}
 
+          <Button
+            type="submit"
+            loading={loading}
+            disabled={!canAdd}
+            className="w-full"
+          >
+            Adicionar equipa
+          </Button>
+
           {error && (
-            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           )}
-        </div>
+        </form>
       )}
 
       {players.length === 0 ? (
         <p className="text-center py-6 text-sm text-slate-400">
-          Nenhum jogador adicionado ainda.
+          Nenhuma equipa adicionada ainda.
         </p>
       ) : (
         <DndContext

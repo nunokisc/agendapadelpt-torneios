@@ -58,11 +58,15 @@ async function createTournament(data: {
   });
 }
 
-async function createPlayers(tournamentId: string, names: string[]) {
+type TeamInput = { player1: string; player2: string; teamName?: string };
+
+async function createPlayers(tournamentId: string, teams: TeamInput[]) {
   const players = [];
-  for (let i = 0; i < names.length; i++) {
+  for (let i = 0; i < teams.length; i++) {
+    const { player1, player2, teamName } = teams[i];
+    const name = teamName ?? `${player1} / ${player2}`;
     const p = await prisma.player.create({
-      data: { tournamentId, name: names[i], seed: i + 1 },
+      data: { tournamentId, name, player1Name: player1, player2Name: player2, seed: i + 1 },
     });
     players.push(p);
   }
@@ -149,8 +153,14 @@ async function seedDraft() {
     format: "single_elimination", matchFormat: "B1",
   });
   await createPlayers(t.id, [
-    "Nuno Cardoso", "João Silva", "Miguel Costa", "Pedro Ferreira",
-    "Rui Santos", "André Oliveira", "Luís Pereira", "Carlos Rodrigues",
+    { player1: "Nuno Cardoso",  player2: "João Silva",      teamName: "Cardoso / Silva" },
+    { player1: "Miguel Costa",  player2: "Pedro Ferreira" },
+    { player1: "Rui Santos",    player2: "André Oliveira" },
+    { player1: "Luís Pereira",  player2: "Carlos Rodrigues" },
+    { player1: "Tiago Mendes",  player2: "Bruno Alves" },
+    { player1: "Ricardo Sousa", player2: "Filipe Gomes" },
+    { player1: "Hugo Martins",  player2: "Diogo Lopes" },
+    { player1: "Marco Neves",   player2: "Sérgio Pinto" },
   ]);
   console.log("✓ Demo Rascunho criado → /tournament/demo-rascunho?token=admin-rascunho");
 }
@@ -165,8 +175,14 @@ async function seedSingleEliminationInProgress() {
     thirdPlace: true, status: "in_progress",
   });
   const players = await createPlayers(t.id, [
-    "Nuno Cardoso", "João Silva", "Miguel Costa", "Pedro Ferreira",
-    "Rui Santos", "André Oliveira", "Luís Pereira", "Carlos Rodrigues",
+    { player1: "Nuno Cardoso",  player2: "João Silva",      teamName: "Cardoso / Silva" },
+    { player1: "Rui Santos",    player2: "André Oliveira",  teamName: "Santos / Oliveira" },
+    { player1: "Miguel Costa",  player2: "Pedro Ferreira" },
+    { player1: "Luís Pereira",  player2: "Carlos Rodrigues" },
+    { player1: "Tiago Mendes",  player2: "Bruno Alves" },
+    { player1: "Ricardo Sousa", player2: "Filipe Gomes" },
+    { player1: "Hugo Martins",  player2: "Diogo Lopes" },
+    { player1: "Marco Neves",   player2: "Sérgio Pinto" },
   ]);
   const inputs = generateSingleElimination(8, true);
   const matches = await createMatches(t.id, inputs, players);
@@ -201,7 +217,10 @@ async function seedSingleEliminationCompleted() {
     thirdPlace: true, status: "in_progress",
   });
   const players = await createPlayers(t.id, [
-    "Nuno Cardoso", "João Silva", "Miguel Costa", "Pedro Ferreira",
+    { player1: "Nuno Cardoso",  player2: "João Silva",     teamName: "Cardoso / Silva" },
+    { player1: "Miguel Costa",  player2: "Pedro Ferreira", teamName: "Costa / Ferreira" },
+    { player1: "Rui Santos",    player2: "André Oliveira" },
+    { player1: "Luís Pereira",  player2: "Carlos Rodrigues" },
   ]);
   const inputs = generateSingleElimination(4, true);
   const matches = await createMatches(t.id, inputs, players);
@@ -247,7 +266,11 @@ async function seedRoundRobin() {
     format: "round_robin", matchFormat: "C1", status: "in_progress",
   });
   const players = await createPlayers(t.id, [
-    "Nuno Cardoso", "João Silva", "Miguel Costa", "Pedro Ferreira", "Rui Santos",
+    { player1: "Nuno Cardoso",  player2: "João Silva",      teamName: "Cardoso / Silva" },
+    { player1: "Miguel Costa",  player2: "Pedro Ferreira",  teamName: "Costa / Ferreira" },
+    { player1: "Rui Santos",    player2: "André Oliveira" },
+    { player1: "Luís Pereira",  player2: "Carlos Rodrigues" },
+    { player1: "Tiago Mendes",  player2: "Bruno Alves" },
   ]);
   const inputs = generateRoundRobin(5);
   const matches = await createMatches(t.id, inputs, players);
@@ -285,8 +308,14 @@ async function seedGroupsKnockout() {
     groupCount: 2, advanceCount: 2, status: "in_progress",
   });
   const players = await createPlayers(t.id, [
-    "Nuno Cardoso", "João Silva", "Miguel Costa", "Pedro Ferreira",
-    "Rui Santos", "André Oliveira", "Luís Pereira", "Carlos Rodrigues",
+    { player1: "Nuno Cardoso",  player2: "João Silva",      teamName: "Cardoso / Silva" },
+    { player1: "Miguel Costa",  player2: "Pedro Ferreira",  teamName: "Costa / Ferreira" },
+    { player1: "Rui Santos",    player2: "André Oliveira" },
+    { player1: "Luís Pereira",  player2: "Carlos Rodrigues" },
+    { player1: "Tiago Mendes",  player2: "Bruno Alves" },
+    { player1: "Ricardo Sousa", player2: "Filipe Gomes" },
+    { player1: "Hugo Martins",  player2: "Diogo Lopes" },
+    { player1: "Marco Neves",   player2: "Sérgio Pinto" },
   ]);
   const { groupMatches } = generateGroupsKnockout(8, 2);
   const matches = await createMatches(t.id, groupMatches, players);
@@ -321,8 +350,14 @@ async function seedDoubleElimination() {
     format: "double_elimination", matchFormat: "B1", status: "in_progress",
   });
   const players = await createPlayers(t.id, [
-    "Nuno Cardoso", "João Silva", "Miguel Costa", "Pedro Ferreira",
-    "Rui Santos", "André Oliveira", "Luís Pereira", "Carlos Rodrigues",
+    { player1: "Nuno Cardoso",  player2: "João Silva",      teamName: "Cardoso / Silva" },
+    { player1: "Miguel Costa",  player2: "Pedro Ferreira",  teamName: "Costa / Ferreira" },
+    { player1: "Rui Santos",    player2: "André Oliveira" },
+    { player1: "Luís Pereira",  player2: "Carlos Rodrigues" },
+    { player1: "Tiago Mendes",  player2: "Bruno Alves" },
+    { player1: "Ricardo Sousa", player2: "Filipe Gomes" },
+    { player1: "Hugo Martins",  player2: "Diogo Lopes" },
+    { player1: "Marco Neves",   player2: "Sérgio Pinto" },
   ]);
   const inputs = generateDoubleElimination(8);
   const matches = await createMatches(t.id, inputs, players);

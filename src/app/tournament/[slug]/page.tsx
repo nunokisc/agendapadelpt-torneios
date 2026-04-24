@@ -176,7 +176,7 @@ export default function TournamentPage() {
               slug={slug}
               token={token}
               onUpdate={fetchData}
-              disabled={false}
+              disabled={!isAdmin}
             />
 
             {isAdmin && (
@@ -195,7 +195,7 @@ export default function TournamentPage() {
                 </Button>
                 {!canGenerate && (
                   <p className="text-xs text-center text-slate-400">
-                    Precisas de pelo menos 2 jogadores.
+                    Precisas de pelo menos 2 equipas.
                   </p>
                 )}
               </>
@@ -209,7 +209,7 @@ export default function TournamentPage() {
                 <p className="font-medium">Bracket ainda não gerado</p>
                 <p className="text-sm mt-1">
                   {isAdmin
-                    ? "Adiciona os jogadores e clica em Gerar Bracket."
+                    ? "Adiciona as equipas e clica em Gerar Bracket."
                     : "O administrador ainda não gerou o bracket."}
                 </p>
               </div>

@@ -28,6 +28,8 @@ model Tournament {
 model Player {
   id           String  @id @default(cuid())
   name         String
+  player1Name  String  @default("")
+  player2Name  String  @default("")
   seed         Int?
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
