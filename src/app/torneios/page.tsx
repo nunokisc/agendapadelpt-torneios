@@ -108,7 +108,7 @@ export default function TorneiosPage() {
               )}
               <div className="flex items-center justify-between text-xs text-slate-400">
                 <span>{FORMAT_LABELS[t.format] ?? t.format} · {t.matchFormat}</span>
-                <span>{t._count.players} equipa{t._count.players !== 1 ? "s" : ""}</span>
+                <span>{t._count.players} dupla{t._count.players !== 1 ? "s" : ""}</span>
               </div>
               {t.registrationOpen && (
                 <div className="mt-2">

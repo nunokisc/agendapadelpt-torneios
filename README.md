@@ -13,6 +13,7 @@ Plataforma web para criação e gestão de torneios de padel (duplas). Suporta m
 | Drag & drop | @dnd-kit |
 | Validação | Zod |
 | Testes | Vitest |
+| QR Code | qrcode |
 
 ## Funcionalidades
 
@@ -32,11 +33,11 @@ Plataforma web para criação e gestão de torneios de padel (duplas). Suporta m
 | E | Super Tie-Break isolado (primeiro a 10 com 2 de vantagem) |
 | F | Set de 4 jogos sem vantagem, tie-break a 3-3 |
 
-### Gestão de equipas (duplas)
-- Cada equipa tem **Jogador 1** e **Jogador 2** (obrigatórios)
-- Nome de equipa opcional (ex: "Cardoso / Silva"); se omitido, gera-se automaticamente "J1 / J2"
+### Gestão de duplas
+- Cada dupla tem **Jogador 1** e **Jogador 2** (obrigatórios)
+- Nome de dupla opcional (ex: "Cardoso / Silva"); se omitido, gera-se automaticamente "J1 / J2"
 - Drag & drop para definir seeds; shuffle aleatório
-- **Vista pública vs admin**: sem token na URL, todas as opções de edição estão ocultas (adicionar/remover equipas, introduzir resultados, gerar bracket). Com `?token=<adminToken>` o utilizador tem acesso total
+- **Vista pública vs admin**: sem token na URL, todas as opções de edição estão ocultas. Com `?token=<adminToken>` o utilizador tem acesso total
 
 ### Resultados e scores
 - Modal de introdução de resultados com validação em tempo real
@@ -44,13 +45,43 @@ Plataforma web para criação e gestão de torneios de padel (duplas). Suporta m
 - Suporte a tie-breaks e Super Tie-Break com campos dedicados
 - Avanço automático no bracket após cada resultado
 
+### Gestão de torneios (admin)
+- **Editar** — nome, descrição, número de campos, torneio público, inscrições abertas
+- **Eliminar** — apaga torneio e todos os dados associados
+- **Clonar** — cria novo rascunho com as mesmas duplas e configurações
+- Separador **Agenda** — definir court e hora por jogo, ou agendar automaticamente todos os jogos distribuídos pelos campos disponíveis
+- Separador **Inscrições** — aprovar ou rejeitar inscrições pendentes de duplas
+
+### Auto-inscrição pública
+- Página pública `/tournament/[slug]/register` para duplas se inscreverem
+- Formulário: Jogador 1, Jogador 2, nome de dupla (opcional), contacto (opcional)
+- Inscrições ficam pendentes até o admin aprovar (cria dupla) ou rejeitar
+- Activado por `registrationOpen` no torneio
+
+### Agenda e campos
+- Campo `courtCount` no torneio define o número de campos disponíveis
+- Auto-agendamento: distribui jogos por ronda pelos campos com duração configurável por jogo
+- Cada jogo pode ter court e hora definidos individualmente
+
+### Estatísticas
+- Página `/tournament/[slug]/stats` com classificação de todas as duplas
+- Colunas: jogos disputados, vitórias, derrotas, % vitórias, sets+/-, games+/-
+- Cards de sumário: total de duplas, jogos realizados, jogos totais, formato
+
+### Diretório público
+- `/torneios` lista todos os torneios marcados como públicos
+- Pesquisa por nome/descrição, badge de inscrições abertas
+
 ### UX
 - Dark mode com toggle (persiste em `localStorage`, sem flash ao carregar)
 - Toast notifications para feedback de acções
 - Loading skeletons durante carregamento
 - Vista de bracket em ecrã completo (`/tournament/[slug]/bracket`)
+  - Botão **Imprimir** com CSS de impressão (oculta nav, mostra cabeçalho limpo)
+  - **Vista mobile**: tabs por ronda para navegar jogo a jogo; bracket visual completo em desktop
 - Destaque do caminho vencedor no bracket
 - Auto-refresh da vista pública a cada 30 segundos
+- QR code da ligação pública em `LinkShare` (gerado localmente, download PNG)
 
 ### "Os meus torneios"
 - Torneios criados no browser ficam guardados em `localStorage`
@@ -101,33 +132,42 @@ src/
 ├── app/
 │   ├── page.tsx                          # Homepage (criar torneio + Os meus torneios)
 │   ├── admin/page.tsx                    # Painel de administração global
+│   ├── torneios/page.tsx                 # Diretório público de torneios
 │   ├── api/
 │   │   ├── admin/route.ts                # GET /api/admin (token plataforma)
+│   │   ├── tournaments/route.ts          # GET /api/tournaments (públicos)
 │   │   └── tournament/
 │   │       ├── route.ts                  # POST /api/tournament (criar)
 │   │       └── [slug]/
-│   │           ├── route.ts              # GET /api/tournament/[slug]
+│   │           ├── route.ts              # GET / PATCH / DELETE torneio
 │   │           ├── generate/route.ts     # POST gerar bracket
-│   │           ├── players/route.ts      # POST/PUT/DELETE equipas
-│   │           └── match/[matchId]/      # PUT introduzir resultado
+│   │           ├── players/route.ts      # POST/PUT/DELETE duplas
+│   │           ├── match/[matchId]/      # PUT introduzir resultado
+│   │           ├── clone/route.ts        # POST clonar torneio
+│   │           ├── register/route.ts     # GET/POST/PATCH inscrições
+│   │           └── schedule/route.ts     # PATCH/POST agenda de jogos
 │   └── tournament/[slug]/
-│       ├── page.tsx                      # Vista principal do torneio
-│       └── bracket/page.tsx              # Ecrã completo do bracket
+│       ├── page.tsx                      # Vista principal (tabs: Bracket / Agenda / Inscrições)
+│       ├── bracket/page.tsx              # Ecrã completo + imprimir
+│       ├── stats/page.tsx                # Estatísticas por dupla
+│       └── register/page.tsx             # Inscrição pública de dupla
 ├── components/
 │   ├── bracket/
 │   │   ├── MatchCard.tsx                 # Cartão de jogo (destaque vencedor)
-│   │   ├── SingleEliminationBracket.tsx  # Com winner path highlighting
+│   │   ├── SingleEliminationBracket.tsx  # Vista desktop + tabs mobile por ronda
 │   │   ├── DoubleEliminationBracket.tsx
 │   │   ├── RoundRobinTable.tsx
 │   │   ├── GroupStageView.tsx
 │   │   └── BracketConnector.tsx
 │   ├── tournament/
 │   │   ├── CreateTournamentForm.tsx
-│   │   ├── PlayerList.tsx                # Formulário de equipas (duplas)
+│   │   ├── PlayerList.tsx                # Formulário de duplas com drag & drop
 │   │   ├── MyTournaments.tsx             # Painel localStorage
 │   │   ├── ScoreInputModal.tsx
-│   │   ├── TournamentHeader.tsx
-│   │   └── LinkShare.tsx
+│   │   ├── TournamentHeader.tsx          # Editar / Eliminar / Clonar
+│   │   ├── LinkShare.tsx                 # Partilhar link + QR code
+│   │   ├── ScheduleManager.tsx           # Agenda de jogos por campo/hora
+│   │   └── RegistrationPanel.tsx         # Aprovar/rejeitar inscrições
 │   └── ui/
 │       ├── ToastProvider.tsx             # Context + hook useToast()
 │       ├── ThemeToggle.tsx               # Dark/light mode
@@ -141,17 +181,18 @@ src/
 │   ├── validators.ts                     # Zod schemas
 │   └── db.ts / slug.ts / utils.ts / seeding.ts / round-robin.ts
 ├── __tests__/
-│   ├── scoring.test.ts                   # 60+ testes de scoring
-│   ├── bracket-engine.test.ts            # 49 testes de geração de brackets
+│   ├── scoring.test.ts                   # Testes de scoring
+│   ├── bracket-engine.test.ts            # Testes de geração de brackets
 │   └── standings.test.ts                 # Testes de classificação
-└── types/index.ts                        # Tournament, Player, Match, etc.
+└── types/index.ts                        # Tournament, Player, Match, Registration, etc.
 
 prisma/
 ├── schema.prisma
 └── migrations/
     ├── 20260423195815_init/              # Schema inicial
     ├── 20260423_scoring/                 # matchFormat (substitui setsToWin)
-    └── 20260424_doubles/                 # player1Name + player2Name
+    ├── 20260424_doubles/                 # player1Name + player2Name
+    └── 20260424_features/                # schedule, isPublic, registrationOpen, courtCount, Registration
 
 scripts/
 ├── setup-db.mjs                          # Cria DB e aplica migrations via SQLite directo
@@ -162,17 +203,20 @@ scripts/
 
 ```prisma
 model Tournament {
-  slug         String  @unique
-  adminToken   String  @unique
-  format       String  // single_elimination | double_elimination | round_robin | groups_knockout
-  matchFormat  String  @default("B1")
-  status       String  @default("draft") // draft | in_progress | completed
-  thirdPlace   Boolean @default(false)
-  groupCount   Int?
-  advanceCount Int?
+  slug             String   @unique
+  adminToken       String   @unique
+  format           String   // single_elimination | double_elimination | round_robin | groups_knockout
+  matchFormat      String   @default("B1")
+  status           String   @default("draft") // draft | in_progress | completed
+  thirdPlace       Boolean  @default(false)
+  groupCount       Int?
+  advanceCount     Int?
+  isPublic         Boolean  @default(false)
+  registrationOpen Boolean  @default(false)
+  courtCount       Int?
 }
 
-model Player {              // representa uma equipa de duplas
+model Player {              // representa uma dupla
   name         String      // nome de exibição: teamName ou "J1 / J2"
   player1Name  String      // nome do primeiro jogador
   player2Name  String      // nome do segundo jogador
@@ -183,15 +227,26 @@ model Player {              // representa uma equipa de duplas
 model Match {
   round            Int
   position         Int
-  bracketType      String  // winners | losers | final | group | third_place
+  bracketType      String    // winners | losers | final | group | third_place
   groupIndex       Int?
   team1Id          String?
   team2Id          String?
   winnerId         String?
-  scores           String? // JSON: SetScore[]
-  status           String  // pending | in_progress | completed | bye
+  scores           String?   // JSON: SetScore[]
+  scheduledAt      DateTime?
+  court            String?
+  status           String    // pending | in_progress | completed | bye
   nextMatchId      String?
   loserNextMatchId String?
+}
+
+model Registration {
+  tournamentId String
+  player1Name  String
+  player2Name  String
+  teamName     String?
+  contact      String?
+  status       String  @default("pending") // pending | approved | rejected
 }
 ```
 
@@ -224,3 +279,5 @@ Painel global: `/admin?token=padel-admin-2025`
 **SSR e localStorage**: componentes que dependem de `localStorage` (ex: `MyTournaments`, `ThemeToggle`) usam um estado `ready` inicializado a `false` para evitar hydration mismatch — renderizam `null` no servidor e o conteúdo real após o primeiro `useEffect`.
 
 **Separação admin/público**: a presença do query param `?token=<adminToken>` na URL é o único critério que activa os controlos de edição. Sem token, a página é completamente read-only — os componentes recebem `isAdmin={false}` e escondem formulários, botões e o modal de scores.
+
+**Modelo de dados "dupla"**: o modelo `Player` representa uma dupla de padel. Os campos `player1Name` e `player2Name` guardam os nomes individuais; `name` é o nome de exibição (nome da dupla ou "J1 / J2" gerado automaticamente). Todo o código interno usa `Player`/`team` por razões históricas do ORM mas a terminologia visível ao utilizador é "dupla".

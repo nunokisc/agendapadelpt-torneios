@@ -200,7 +200,7 @@ function AdminPage() {
                     <th className="text-left px-4 py-2.5 hidden sm:table-cell">Formato</th>
                     <th className="text-left px-4 py-2.5 hidden md:table-cell">Jogo</th>
                     <th className="text-center px-4 py-2.5">Estado</th>
-                    <th className="text-center px-4 py-2.5 hidden sm:table-cell">Equipas</th>
+                    <th className="text-center px-4 py-2.5 hidden sm:table-cell">Duplas</th>
                     <th className="text-left px-4 py-2.5 hidden lg:table-cell">Criado em</th>
                     <th className="px-4 py-2.5" />
                   </tr>

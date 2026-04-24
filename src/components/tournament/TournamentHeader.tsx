@@ -228,7 +228,7 @@ export default function TournamentHeader({ tournament, isAdmin, onUpdate }: Tour
                 className="h-4 w-4 rounded accent-emerald-600"
               />
               <span className="text-sm text-slate-700 dark:text-slate-300">
-                Inscrições abertas (equipas podem inscrever-se)
+                Inscrições abertas (duplas podem inscrever-se)
               </span>
             </label>
           </div>
@@ -243,7 +243,7 @@ export default function TournamentHeader({ tournament, isAdmin, onUpdate }: Tour
       <Modal open={showDelete} onClose={() => setShowDelete(false)} title="Eliminar torneio">
         <div className="space-y-4">
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Tens a certeza que queres eliminar <strong>{tournament.name}</strong>? Esta acção é irreversível — todas as equipas, jogos e resultados serão apagados.
+            Tens a certeza que queres eliminar <strong>{tournament.name}</strong>? Esta acção é irreversível — todas as duplas, jogos e resultados serão apagados.
           </p>
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setShowDelete(false)}>Cancelar</Button>
@@ -262,7 +262,7 @@ export default function TournamentHeader({ tournament, isAdmin, onUpdate }: Tour
       <Modal open={showClone} onClose={() => setShowClone(false)} title="Clonar torneio">
         <form onSubmit={handleClone} className="space-y-4">
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Cria um novo torneio em rascunho com as mesmas equipas e configurações.
+            Cria um novo torneio em rascunho com as mesmas duplas e configurações.
           </p>
           <Input
             label="Nome do novo torneio"

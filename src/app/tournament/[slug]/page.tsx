@@ -138,7 +138,7 @@ export default function TournamentPage() {
           </Link>
           {tournament.registrationOpen && isDraft && (
             <Link href={`/tournament/${slug}/register`} className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1">
-              Inscrever equipa →
+              Inscrever dupla →
             </Link>
           )}
         </div>
@@ -160,7 +160,7 @@ export default function TournamentPage() {
                 <Button size="lg" className="w-full" disabled={!canGenerate} loading={generating} onClick={handleGenerate}>
                   Gerar Bracket
                 </Button>
-                {!canGenerate && <p className="text-xs text-center text-slate-400">Precisas de pelo menos 2 equipas.</p>}
+                {!canGenerate && <p className="text-xs text-center text-slate-400">Precisas de pelo menos 2 duplas.</p>}
               </>
             )}
           </div>
@@ -171,11 +171,11 @@ export default function TournamentPage() {
                 <p className="text-2xl mb-2">🎾</p>
                 <p className="font-medium">Bracket ainda não gerado</p>
                 <p className="text-sm mt-1">
-                  {isAdmin ? "Adiciona as equipas e clica em Gerar Bracket." : "O administrador ainda não gerou o bracket."}
+                  {isAdmin ? "Adiciona as duplas e clica em Gerar Bracket." : "O administrador ainda não gerou o bracket."}
                 </p>
                 {tournament.registrationOpen && !isAdmin && (
                   <Link href={`/tournament/${slug}/register`} className="mt-3 inline-block text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
-                    Inscrever equipa →
+                    Inscrever dupla →
                   </Link>
                 )}
               </div>

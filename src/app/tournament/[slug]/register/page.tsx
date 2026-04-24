@@ -88,7 +88,7 @@ export default function RegisterPage() {
         <p className="text-4xl mb-4">🎾</p>
         <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Inscrição enviada!</h1>
         <p className="mt-2 text-slate-500 text-sm">
-          A tua equipa foi submetida. O organizador irá confirmar a inscrição.
+          A tua dupla foi submetida. O organizador irá confirmar a inscrição.
         </p>
         <Link href={`/tournament/${slug}`} className="mt-6 inline-block text-sm text-emerald-600 hover:underline">
           Ver torneio →
@@ -103,8 +103,8 @@ export default function RegisterPage() {
         <Link href={`/tournament/${slug}`} className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
           ← {tournament.name}
         </Link>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2">Inscrição de equipa</h1>
-        <p className="text-sm text-slate-500 mt-1">Preenche os dados da tua equipa. O organizador confirma a inscrição.</p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2">Inscrição de dupla</h1>
+        <p className="text-sm text-slate-500 mt-1">Preenche os dados da tua dupla. O organizador confirma a inscrição.</p>
       </div>
 
       <Card>
@@ -131,7 +131,7 @@ export default function RegisterPage() {
           {showTeamName ? (
             <div className="flex gap-2 items-end">
               <Input
-                label="Nome da equipa (opcional)"
+                label="Nome da dupla (opcional)"
                 placeholder="Ex: Os Campeões"
                 value={teamName}
                 onChange={(e) => setTeamName(e.target.value)}
@@ -144,7 +144,7 @@ export default function RegisterPage() {
             </div>
           ) : (
             <button type="button" onClick={() => setShowTeamName(true)} className="text-xs text-slate-400 hover:text-emerald-600 transition-colors">
-              + Nome de equipa
+              + Nome de dupla
             </button>
           )}
 

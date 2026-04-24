@@ -32,7 +32,7 @@ export async function POST(
   const players = tournament.players;
   if (players.length < 2) {
     return NextResponse.json(
-      { error: "Precisas de pelo menos 2 equipas para gerar o bracket" },
+      { error: "Precisas de pelo menos 2 duplas para gerar o bracket" },
       { status: 400 }
     );
   }

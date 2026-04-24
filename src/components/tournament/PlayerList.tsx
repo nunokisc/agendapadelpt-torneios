@@ -175,7 +175,7 @@ export default function PlayerList({
       });
       if (!res.ok) {
         const d = await res.json();
-        throw new Error(d.error ?? "Erro ao adicionar equipa");
+        throw new Error(d.error ?? "Erro ao adicionar dupla");
       }
       setPlayer1("");
       setPlayer2("");
@@ -197,7 +197,7 @@ export default function PlayerList({
       );
       if (!res.ok) {
         const d = await res.json();
-        throw new Error(d.error ?? "Erro ao remover equipa");
+        throw new Error(d.error ?? "Erro ao remover dupla");
       }
       onUpdate();
     } catch (err) {
@@ -212,7 +212,7 @@ export default function PlayerList({
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Equipas ({players.length})</CardTitle>
+            <CardTitle>Duplas ({players.length})</CardTitle>
             {!disabled && (
               <p className="text-xs text-slate-500 mt-0.5">
                 Arrasta para definir seeds. Seed 1 = cabeça de série.
@@ -254,7 +254,7 @@ export default function PlayerList({
           {showTeamName ? (
             <div className="flex gap-2 items-center">
               <Input
-                placeholder="Nome da equipa (opcional)"
+                placeholder="Nome da dupla (opcional)"
                 value={teamName}
                 onChange={(e) => setTeamName(e.target.value)}
                 disabled={loading}
@@ -274,7 +274,7 @@ export default function PlayerList({
               onClick={() => setShowTeamName(true)}
               className="text-xs text-slate-400 hover:text-emerald-600 transition-colors"
             >
-              + Adicionar nome de equipa
+              + Adicionar nome de dupla
             </button>
           )}
 
@@ -284,7 +284,7 @@ export default function PlayerList({
             disabled={!canAdd}
             className="w-full"
           >
-            Adicionar equipa
+            Adicionar dupla
           </Button>
 
           {error && (
@@ -295,7 +295,7 @@ export default function PlayerList({
 
       {players.length === 0 ? (
         <p className="text-center py-6 text-sm text-slate-400">
-          Nenhuma equipa adicionada ainda.
+          Nenhuma dupla adicionada ainda.
         </p>
       ) : (
         <DndContext

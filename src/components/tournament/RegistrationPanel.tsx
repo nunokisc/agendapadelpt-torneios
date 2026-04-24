@@ -41,7 +41,7 @@ export default function RegistrationPanel({ slug, token, onApproved }: Props) {
         body: JSON.stringify({ registrationId, action }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      toast(action === "approve" ? "Equipa aprovada e adicionada!" : "Inscrição rejeitada.");
+      toast(action === "approve" ? "Dupla aprovada e adicionada!" : "Inscrição rejeitada.");
       await fetchRegistrations();
       if (action === "approve") onApproved();
     } catch (err) {

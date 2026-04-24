@@ -96,7 +96,7 @@ export default function StatsPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
-          { label: "Equipas", value: tournament.players?.length ?? 0 },
+          { label: "Duplas", value: tournament.players?.length ?? 0 },
           { label: "Jogos realizados", value: completedMatches.length },
           { label: "Jogos totais", value: (tournament.matches ?? []).filter((m) => m.status !== "bye").length },
           { label: "Formato", value: tournament.matchFormat },
@@ -110,7 +110,7 @@ export default function StatsPage() {
 
       {/* Team stats table */}
       <Card>
-        <CardHeader><CardTitle>Classificação das equipas</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Classificação das duplas</CardTitle></CardHeader>
         {stats.length === 0 ? (
           <p className="text-sm text-slate-400 text-center py-6">Ainda não há resultados registados.</p>
         ) : (
@@ -119,7 +119,7 @@ export default function StatsPage() {
               <thead>
                 <tr className="text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100 dark:border-slate-800">
                   <th className="text-left py-2 px-2">#</th>
-                  <th className="text-left py-2 px-2">Equipa</th>
+                  <th className="text-left py-2 px-2">Dupla</th>
                   <th className="text-center py-2 px-2">J</th>
                   <th className="text-center py-2 px-2">V</th>
                   <th className="text-center py-2 px-2">D</th>

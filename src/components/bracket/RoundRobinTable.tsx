@@ -98,7 +98,7 @@ export default function RoundRobinTable({ matches, players, isAdmin, onMatchClic
           <thead>
             <tr className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
               <th className="text-left py-2 pr-4 pl-2">#</th>
-              <th className="text-left py-2 pr-4">Equipa</th>
+              <th className="text-left py-2 pr-4">Dupla</th>
               <th className="py-2 px-2 text-center">V</th>
               <th className="py-2 px-2 text-center">D</th>
               <th className="py-2 px-2 text-center">S+</th>
