@@ -8,9 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "db:setup": "node scripts/setup-db.mjs",
-    "db:migrate": "prisma migrate dev",
+    "db:reset": "node scripts/db-reset.mjs",
     "db:seed": "tsx scripts/seed-demo.ts",
-    "db:reset": "node -e \"require('fs').rmSync('prisma/dev.db',{force:true});require('fs').rmSync('prisma/dev.db-shm',{force:true});require('fs').rmSync('prisma/dev.db-wal',{force:true})\" && npm run db:setup && npm run db:seed",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

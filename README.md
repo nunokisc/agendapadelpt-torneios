@@ -93,12 +93,48 @@ Plataforma web para criação e gestão de torneios de padel (duplas). Suporta m
 - Protegido por `PLATFORM_ADMIN_TOKEN` (variável de ambiente)
 - Estatísticas por estado, pesquisa por nome/slug
 
+## Base de dados
+
+A aplicação suporta **SQLite** e **MySQL / MariaDB**. A escolha é feita através de `DATABASE_URL` no ficheiro `.env`.
+
+### SQLite (padrão)
+
+Não requer servidor. Funciona em dev e em produção.
+
+```env
+DATABASE_URL="file:./dev.db"
+```
+
+### MySQL / MariaDB
+
+```env
+DATABASE_URL="mysql://user:password@localhost:3306/padel_torneios"
+# ou
+DATABASE_URL="mariadb://user:password@localhost:3306/padel_torneios"
+```
+
+Cria a base de dados no servidor antes de correr `db:setup`:
+```sql
+CREATE DATABASE padel_torneios CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### Como funciona `db:setup`
+
+O script detecta o tipo de base de dados pelo prefixo do `DATABASE_URL`, patcha automaticamente o `prisma/schema.prisma` com o `provider` correcto, corre `prisma generate` e aplica as migrações:
+
+- **SQLite** → aplica os ficheiros SQL em `prisma/migrations-sqlite/` directamente via `better-sqlite3`
+- **MySQL/MariaDB** → corre `prisma migrate deploy` com a migração em `prisma/migrations/`
+
 ## Variáveis de ambiente
 
 Criar `.env` na raiz do projecto:
 
 ```env
-DATABASE_URL="file:./dev.db"
+# Escolhe UMA das opções:
+DATABASE_URL="file:./dev.db"                                        # SQLite
+# DATABASE_URL="mysql://user:password@localhost:3306/padel_torneios" # MySQL
+# DATABASE_URL="mariadb://user:password@localhost:3306/padel_torneios" # MariaDB
+
 PLATFORM_ADMIN_TOKEN=padel-admin-2025
 ```
 
@@ -108,13 +144,10 @@ PLATFORM_ADMIN_TOKEN=padel-admin-2025
 # Desenvolvimento
 npm run dev
 
-# Base de dados — primeira configuração
-npx prisma generate       # gera o Prisma client (obrigatório após instalar ou alterar schema.prisma)
-npm run db:setup          # cria dev.db e aplica todas as migrations via SQLite directo
-npm run db:seed           # insere os 6 torneios de demonstração
-
-# Reset completo (apaga DB e recria com seed — uso frequente em dev)
-npm run db:reset
+# Base de dados
+npm run db:setup    # configura DB (detecta SQLite/MySQL pelo DATABASE_URL)
+npm run db:seed     # insere os 6 torneios de demonstração
+npm run db:reset    # apaga e recria a DB com seed (SQLite: apaga ficheiro; MySQL: migrate reset)
 
 # Testes
 npm run test              # corre todos os testes (vitest)
@@ -187,12 +220,14 @@ src/
 └── types/index.ts                        # Tournament, Player, Match, Registration, etc.
 
 prisma/
-├── schema.prisma
-└── migrations/
-    ├── 20260423195815_init/              # Schema inicial
-    ├── 20260423_scoring/                 # matchFormat (substitui setsToWin)
-    ├── 20260424_doubles/                 # player1Name + player2Name
-    └── 20260424_features/                # schedule, isPublic, registrationOpen, courtCount, Registration
+├── schema.prisma                         # patchado pelo db:setup (provider varia)
+├── migrations/                           # migrações MySQL/MariaDB (usadas por prisma migrate deploy)
+│   └── 20260424000000_init_mysql/
+└── migrations-sqlite/                    # migrações SQLite (aplicadas pelo setup-db.mjs)
+    ├── 20260423195815_init/
+    ├── 20260423_scoring/
+    ├── 20260424_doubles/
+    └── 20260424_features/
 
 scripts/
 ├── setup-db.mjs                          # Cria DB e aplica migrations via SQLite directo
@@ -267,12 +302,15 @@ Painel global: `/admin?token=padel-admin-2025`
 
 ## Notas de implementação
 
-**Quirk do Prisma + better-sqlite3**: `prisma migrate deploy` não funciona correctamente neste setup. O script `db:setup` aplica as migrations directamente via SQL e regista-as em `_prisma_migrations` manualmente. Ao adicionar uma nova migration:
-1. Criar o ficheiro SQL em `prisma/migrations/<nome>/migration.sql`
-2. Actualizar `prisma/schema.prisma`
-3. Adicionar a migration ao array `migrations` em `scripts/setup-db.mjs`
-4. Correr `npx prisma generate` para regenerar o cliente
-5. Correr `npm run db:reset` para aplicar
+**Quirk do Prisma + better-sqlite3**: `prisma migrate deploy` não funciona com o adapter better-sqlite3. Para SQLite, o script `db:setup` aplica as migrations directamente via `better-sqlite3` e regista-as em `_prisma_migrations` manualmente. Para MySQL, usa `prisma migrate deploy` normalmente.
+
+**Adicionar uma nova migration:**
+| | SQLite | MySQL |
+|---|---|---|
+| Ficheiro SQL | `prisma/migrations-sqlite/<nome>/migration.sql` (sintaxe SQLite) | `prisma/migrations/<nome>/migration.sql` (sintaxe MySQL) |
+| Schema | Actualizar `prisma/schema.prisma` | Idem |
+| Setup script | Adicionar ao array `migrations` em `scripts/setup-db.mjs` | N/A — `prisma migrate deploy` detecta automaticamente |
+| Gerar client | `npm run db:setup` (inclui `prisma generate`) | Idem |
 
 **Geração do bracket de Grupos+Knockout**: quando o último jogo de grupo é registado, o servidor computa automaticamente as classificações e gera o bracket de eliminação, dentro da mesma transacção Prisma.
 
