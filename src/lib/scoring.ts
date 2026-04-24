@@ -153,12 +153,10 @@ function determineRegularSetWinner(t1: number, t2: number, maxGames: number, tie
 }
 
 function determineLongSetWinner(t1: number, t2: number, tiebreakAt: number): 1 | 2 | null {
-  // 9-game set: first to 9 with 2+ diff, or at 8-8 tiebreak is played
-  if (t1 >= 9 && t1 - t2 >= 2) return 1;
-  if (t2 >= 9 && t2 - t1 >= 2) return 2;
-  // 8-7 is valid (winner = side with more), since tiebreakAt=8 means 8-8 triggers tiebreak
-  if (t1 === tiebreakAt - 1 + 1 && t2 === tiebreakAt - 1 && t1 > t2) return 1; // 8-7
-  if (t2 === tiebreakAt - 1 + 1 && t1 === tiebreakAt - 1 && t2 > t1) return 2; // 7-8
+  // First to tiebreakAt+1 games while opponent is below tiebreakAt (e.g. 9-0..9-7)
+  // At tiebreakAt-tiebreakAt (e.g. 8-8) a tiebreak is played instead
+  if (t1 >= tiebreakAt + 1 && t2 < tiebreakAt) return 1;
+  if (t2 >= tiebreakAt + 1 && t1 < tiebreakAt) return 2;
   return null;
 }
 
@@ -167,6 +165,7 @@ function determineLongSetWinner(t1: number, t2: number, tiebreakAt: number): 1 |
  */
 export function determineMatchWinner(scores: SetScore[], format: MatchFormat): 1 | 2 | null {
   const structure = getFormatStructure(format);
+  const setsToWin = structure.filter((s) => !s.conditional).length;
   let t1Sets = 0;
   let t2Sets = 0;
 
@@ -185,8 +184,8 @@ export function determineMatchWinner(scores: SetScore[], format: MatchFormat): 1
     else if (winner === 2) t2Sets++;
   }
 
-  if (t1Sets > t2Sets) return 1;
-  if (t2Sets > t1Sets) return 2;
+  if (t1Sets >= setsToWin) return 1;
+  if (t2Sets >= setsToWin) return 2;
   return null;
 }
 
@@ -241,7 +240,11 @@ export function validateScores(scores: SetScore[], format: MatchFormat): { valid
     else if (winner === 2) t2Sets++;
   }
 
-  // Final check: must have a winner
+  // Final check: a side must have won the required number of sets
+  const setsToWin = structure.filter((s) => !s.conditional).length;
+  if (Math.max(t1Sets, t2Sets) < setsToWin) {
+    return { valid: false, error: 'Resultado incompleto — o vencedor ainda não foi determinado' };
+  }
   if (t1Sets === t2Sets) {
     return { valid: false, error: 'Resultado empatado — o vencedor não foi determinado' };
   }
