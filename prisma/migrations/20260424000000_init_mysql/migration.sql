@@ -30,6 +30,7 @@ CREATE TABLE `Player` (
     `player1Name`  VARCHAR(191) NOT NULL DEFAULT '',
     `player2Name`  VARCHAR(191) NOT NULL DEFAULT '',
     `seed`         INTEGER      NULL,
+    `checkedIn`    BOOLEAN      NOT NULL DEFAULT true,
     `tournamentId` VARCHAR(191) NOT NULL,
     `groupIndex`   INTEGER      NULL,
 

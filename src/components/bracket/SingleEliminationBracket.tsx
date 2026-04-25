@@ -5,11 +5,11 @@ import MatchCard from "./MatchCard";
 import BracketConnector from "./BracketConnector";
 import type { Match } from "@/types";
 
-// Layout constants
-const CARD_W = 220;
+// Layout constants — CARD_W must match MatchCard's w-[260px]
+const CARD_W = 260;
 const CARD_H = 72;
-const COL_GAP = 60; // horizontal gap between rounds
-const ROW_GAP = 16; // vertical gap between cards in same round
+const COL_GAP = 48; // horizontal gap between rounds
+const ROW_GAP = 12; // vertical gap between cards in same round
 
 interface Props {
   matches: Match[];
@@ -225,7 +225,7 @@ export default function SingleEliminationBracket({ matches, isAdmin, onMatchClic
         {thirdPlace.length > 0 && (
           <div
             className="text-xs font-semibold text-amber-500 uppercase tracking-wide text-center"
-            style={{ width: CARD_W, marginLeft: COL_GAP - CARD_W - COL_GAP + (CARD_W + COL_GAP) * (maxRound - 1) + CARD_W + COL_GAP }}
+            style={{ width: CARD_W, marginLeft: COL_GAP }}
           >
             3.º / 4.º lugar
           </div>

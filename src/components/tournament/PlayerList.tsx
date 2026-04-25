@@ -28,11 +28,13 @@ function SortablePlayer({
   player,
   index,
   onRemove,
+  onToggleCheckin,
   disabled,
 }: {
   player: Player;
   index: number;
   onRemove: () => void;
+  onToggleCheckin: () => void;
   disabled: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -50,7 +52,9 @@ function SortablePlayer({
     <li
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 group"
+      className={`flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 group ${
+        !player.checkedIn ? "opacity-50" : ""
+      }`}
     >
       {!disabled && (
         <button
@@ -61,6 +65,22 @@ function SortablePlayer({
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
             <path d="M8 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM16 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM16 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 22a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM16 22a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+          </svg>
+        </button>
+      )}
+
+      {!disabled && (
+        <button
+          onClick={onToggleCheckin}
+          title={player.checkedIn ? "Marcar como ausente" : "Confirmar presença"}
+          className={`shrink-0 h-5 w-5 rounded border-2 flex items-center justify-center transition-colors ${
+            player.checkedIn
+              ? "bg-emerald-500 border-emerald-500 text-white"
+              : "border-slate-300 dark:border-slate-600 text-transparent"
+          }`}
+        >
+          <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         </button>
       )}
@@ -118,6 +138,11 @@ export default function PlayerList({
   const [showTeamName, setShowTeamName] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Bulk import state
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -188,6 +213,93 @@ export default function PlayerList({
     }
   }
 
+  function parseBulkText(text: string): { player1: string; player2: string }[] {
+    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+    const teams: { player1: string; player2: string }[] = [];
+
+    for (const line of lines) {
+      // Format: "Player1 / Player2" or "Player1 - Player2"
+      const sep = line.includes("/") ? "/" : line.includes(" - ") ? " - " : null;
+      if (sep) {
+        const [p1, p2] = line.split(sep).map((s) => s.trim());
+        if (p1 && p2) { teams.push({ player1: p1, player2: p2 }); continue; }
+      }
+      // Format: alternating lines — pair consecutive lines
+      teams.push({ player1: line, player2: "" });
+    }
+
+    // Fix alternating format: if any player2 is empty, pair with next line
+    const result: { player1: string; player2: string }[] = [];
+    for (let i = 0; i < teams.length; i++) {
+      if (teams[i].player2 === "" && i + 1 < teams.length && teams[i + 1].player2 === "") {
+        result.push({ player1: teams[i].player1, player2: teams[i + 1].player1 });
+        i++;
+      } else if (teams[i].player2 !== "") {
+        result.push(teams[i]);
+      }
+    }
+
+    return result;
+  }
+
+  async function handleBulkImport() {
+    const teams = parseBulkText(bulkText);
+    if (teams.length === 0) { setError("Nenhuma dupla válida encontrada."); return; }
+
+    setError(null);
+    setBulkLoading(true);
+    try {
+      const res = await fetch(`/api/tournament/${slug}/players?token=${token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teams }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error ?? "Erro ao importar duplas");
+      }
+      setBulkText("");
+      setShowBulk(false);
+      onUpdate();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido");
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
+  async function handleToggleCheckin(player: Player) {
+    try {
+      await fetch(`/api/tournament/${slug}/players?token=${token}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: player.id, checkedIn: !player.checkedIn }),
+      });
+      onUpdate();
+    } catch {
+      // silent fail — UI will revert on next refresh
+    }
+  }
+
+  async function handleCheckInAll(checkedIn: boolean) {
+    try {
+      await Promise.all(
+        players
+          .filter((p) => p.checkedIn !== checkedIn)
+          .map((p) =>
+            fetch(`/api/tournament/${slug}/players?token=${token}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ playerId: p.id, checkedIn }),
+            })
+          )
+      );
+      onUpdate();
+    } catch {
+      // silent fail
+    }
+  }
+
   async function removePlayer(playerId: string) {
     setError(null);
     try {
@@ -206,6 +318,8 @@ export default function PlayerList({
   }
 
   const canAdd = player1.trim().length > 0 && player2.trim().length > 0;
+  const checkedInCount = players.filter((p) => p.checkedIn).length;
+  const bulkPreview = parseBulkText(bulkText);
 
   return (
     <Card>
@@ -213,84 +327,157 @@ export default function PlayerList({
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>Duplas ({players.length})</CardTitle>
-            {!disabled && (
+            {!disabled && players.length > 0 && (
+              <p className="text-xs text-slate-500 mt-0.5">
+                {checkedInCount}/{players.length} confirmadas · Arrasta para seeds
+              </p>
+            )}
+            {!disabled && players.length === 0 && (
               <p className="text-xs text-slate-500 mt-0.5">
                 Arrasta para definir seeds. Seed 1 = cabeça de série.
               </p>
             )}
           </div>
           {!disabled && players.length > 1 && (
-            <button
-              onClick={handleShuffle}
-              className="text-xs text-slate-400 hover:text-emerald-600 transition-colors flex items-center gap-1"
-              title="Seeds aleatórios"
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4l16 16M4 20h4l12-12V4h-4L4 16v4z" />
-              </svg>
-              Shuffle
-            </button>
+            <div className="flex items-center gap-2">
+              {checkedInCount < players.length ? (
+                <button
+                  onClick={() => handleCheckInAll(true)}
+                  className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 transition-colors"
+                  title="Confirmar todas as duplas"
+                >
+                  ✓ Todas
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleCheckInAll(false)}
+                  className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+                  title="Desmarcar todas"
+                >
+                  ✗ Nenhuma
+                </button>
+              )}
+              <button
+                onClick={handleShuffle}
+                className="text-xs text-slate-400 hover:text-emerald-600 transition-colors flex items-center gap-1"
+                title="Seeds aleatórios"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4l16 16M4 20h4l12-12V4h-4L4 16v4z" />
+                </svg>
+                Shuffle
+              </button>
+            </div>
           )}
         </div>
       </CardHeader>
 
       {!disabled && (
-        <form onSubmit={handleAdd} className="mb-4 space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <Input
-              placeholder="Jogador 1"
-              value={player1}
-              onChange={(e) => setPlayer1(e.target.value)}
-              disabled={loading}
-            />
-            <Input
-              placeholder="Jogador 2"
-              value={player2}
-              onChange={(e) => setPlayer2(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-
-          {showTeamName ? (
-            <div className="flex gap-2 items-center">
-              <Input
-                placeholder="Nome da dupla (opcional)"
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-                disabled={loading}
-                className="flex-1"
+        <>
+          {showBulk ? (
+            <div className="mb-4 space-y-2">
+              <p className="text-xs text-slate-500">
+                Uma dupla por linha: <span className="font-mono">João / Maria</span> ou nomes alternados (um por linha).
+              </p>
+              <textarea
+                value={bulkText}
+                onChange={(e) => setBulkText(e.target.value)}
+                placeholder={"João Silva / Maria Santos\nPedro Costa / Ana Lima\n\nou alternado:\nJoão Silva\nMaria Santos"}
+                rows={6}
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none font-mono"
               />
-              <button
-                type="button"
-                onClick={() => { setShowTeamName(false); setTeamName(""); }}
-                className="text-slate-400 hover:text-slate-600 text-xs shrink-0"
-              >
-                Remover
-              </button>
+              {bulkText.trim() && (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                  {bulkPreview.length} dupla{bulkPreview.length !== 1 ? "s" : ""} detectada{bulkPreview.length !== 1 ? "s" : ""}
+                </p>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  loading={bulkLoading}
+                  disabled={bulkPreview.length === 0}
+                  onClick={handleBulkImport}
+                  className="flex-1"
+                >
+                  Importar {bulkPreview.length > 0 ? `${bulkPreview.length} duplas` : ""}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => { setShowBulk(false); setBulkText(""); setError(null); }}
+                >
+                  Cancelar
+                </Button>
+              </div>
             </div>
           ) : (
+            <form onSubmit={handleAdd} className="mb-4 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  placeholder="Jogador 1"
+                  value={player1}
+                  onChange={(e) => setPlayer1(e.target.value)}
+                  disabled={loading}
+                />
+                <Input
+                  placeholder="Jogador 2"
+                  value={player2}
+                  onChange={(e) => setPlayer2(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+
+              {showTeamName ? (
+                <div className="flex gap-2 items-center">
+                  <Input
+                    placeholder="Nome da dupla (opcional)"
+                    value={teamName}
+                    onChange={(e) => setTeamName(e.target.value)}
+                    disabled={loading}
+                    className="flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setShowTeamName(false); setTeamName(""); }}
+                    className="text-slate-400 hover:text-slate-600 text-xs shrink-0"
+                  >
+                    Remover
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowTeamName(true)}
+                  className="text-xs text-slate-400 hover:text-emerald-600 transition-colors"
+                >
+                  + Adicionar nome de dupla
+                </button>
+              )}
+
+              <Button
+                type="submit"
+                loading={loading}
+                disabled={!canAdd}
+                className="w-full"
+              >
+                Adicionar dupla
+              </Button>
+            </form>
+          )}
+
+          <div className="flex items-center justify-between mb-2">
             <button
-              type="button"
-              onClick={() => setShowTeamName(true)}
+              onClick={() => { setShowBulk((v) => !v); setError(null); }}
               className="text-xs text-slate-400 hover:text-emerald-600 transition-colors"
             >
-              + Adicionar nome de dupla
+              {showBulk ? "← Adicionar individualmente" : "Importar lista em massa"}
             </button>
-          )}
-
-          <Button
-            type="submit"
-            loading={loading}
-            disabled={!canAdd}
-            className="w-full"
-          >
-            Adicionar dupla
-          </Button>
+          </div>
 
           {error && (
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            <p className="text-sm text-red-600 dark:text-red-400 mb-2">{error}</p>
           )}
-        </form>
+        </>
       )}
 
       {players.length === 0 ? (
@@ -314,6 +501,7 @@ export default function PlayerList({
                   player={player}
                   index={idx}
                   onRemove={() => removePlayer(player.id)}
+                  onToggleCheckin={() => handleToggleCheckin(player)}
                   disabled={disabled}
                 />
               ))}

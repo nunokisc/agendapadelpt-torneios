@@ -31,10 +31,10 @@ export async function POST(
     return NextResponse.json({ error: "O bracket já foi gerado" }, { status: 400 });
   }
 
-  const players = tournament.players;
+  const players = tournament.players.filter((p) => p.checkedIn);
   if (players.length < 2) {
     return NextResponse.json(
-      { error: "Precisas de pelo menos 2 duplas para gerar o bracket" },
+      { error: "Precisas de pelo menos 2 duplas confirmadas para gerar o bracket" },
       { status: 400 }
     );
   }

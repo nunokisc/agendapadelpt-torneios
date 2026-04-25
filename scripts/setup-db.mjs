@@ -83,6 +83,7 @@ if (isMySQL) {
     { id: "setup-scoring",  name: "20260423_scoring" },
     { id: "setup-doubles",  name: "20260424_doubles" },
     { id: "setup-features", name: "20260424_features" },
+    { id: "setup-checkin",  name: "20260425_checkin" },
   ];
 
   const db = new Database(dbPath);

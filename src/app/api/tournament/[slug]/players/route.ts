@@ -89,6 +89,32 @@ export async function PUT(
   return NextResponse.json({ success: true });
 }
 
+// PATCH — toggle check-in status
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  const { slug } = await params;
+  const token = extractAdminToken(req, slug);
+  const { playerId, checkedIn } = await req.json();
+
+  if (!playerId || typeof checkedIn !== "boolean") {
+    return NextResponse.json({ error: "playerId e checkedIn são obrigatórios" }, { status: 400 });
+  }
+
+  const tournament = await prisma.tournament.findUnique({ where: { slug } });
+  if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
+  if (tournament.adminToken !== token) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
+  if (tournament.status !== "draft") return NextResponse.json({ error: "Torneio já em progresso" }, { status: 400 });
+
+  const player = await prisma.player.update({
+    where: { id: playerId, tournamentId: tournament.id },
+    data: { checkedIn },
+  });
+
+  return NextResponse.json({ player });
+}
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }

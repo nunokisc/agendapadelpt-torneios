@@ -35,6 +35,7 @@ model Player {
   player1Name  String  @default("")
   player2Name  String  @default("")
   seed         Int?
+  checkedIn    Boolean @default(true)
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   groupIndex   Int?

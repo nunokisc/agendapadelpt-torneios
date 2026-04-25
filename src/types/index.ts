@@ -62,6 +62,7 @@ export interface Player {
   player1Name: string;
   player2Name: string;
   seed: number | null;
+  checkedIn: boolean;
   tournamentId: string;
   groupIndex: number | null;
 }
