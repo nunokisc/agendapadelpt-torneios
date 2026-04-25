@@ -88,11 +88,7 @@ if (isMySQL) {
 
   const db = new Database(dbPath);
 
-  for (const m of migrations) {
-    const sqlPath = resolve(root, `prisma/migrations-sqlite/${m.name}/migration.sql`);
-    db.exec(readFileSync(sqlPath, "utf8"));
-  }
-
+  // Ensure migration tracking table exists
   db.exec(`
     CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
       "id"                  TEXT NOT NULL PRIMARY KEY,
@@ -106,13 +102,24 @@ if (isMySQL) {
     );
   `);
 
+  const check = db.prepare(`SELECT id FROM "_prisma_migrations" WHERE id = ?`);
   const insert = db.prepare(`
     INSERT OR IGNORE INTO "_prisma_migrations"
       ("id", "checksum", "finished_at", "migration_name", "logs", "rolled_back_at", "applied_steps_count")
     VALUES (?, ?, datetime('now'), ?, NULL, NULL, 1)
   `);
-  for (const m of migrations) insert.run(m.id, "manual-setup", m.name);
+
+  for (const m of migrations) {
+    if (check.get(m.id)) {
+      console.log(`  skip  ${m.name} (already applied)`);
+      continue;
+    }
+    const sqlPath = resolve(root, `prisma/migrations-sqlite/${m.name}/migration.sql`);
+    db.exec(readFileSync(sqlPath, "utf8"));
+    insert.run(m.id, "manual-setup", m.name);
+    console.log(`  apply ${m.name}`);
+  }
 
   db.close();
-  console.log("SQLite database created at", dbPath);
+  console.log("SQLite database ready at", dbPath);
 }
