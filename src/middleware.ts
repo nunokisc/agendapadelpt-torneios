@@ -55,7 +55,7 @@ export function middleware(req: NextRequest) {
     }
   }
 
-  // ── Admin token: URL param → cookie → clean redirect ──
+  // ── Admin token: URL param → cookie (keep URL as-is for client-side nav) ──
   if (pathname.startsWith("/tournament/")) {
     const tokenParam = searchParams.get("token");
 
@@ -64,10 +64,11 @@ export function middleware(req: NextRequest) {
       const parts = pathname.split("/");
       const slug = parts[2];
       if (slug) {
-        // Store token in httpOnly cookie scoped to this tournament
-        const cleanUrl = req.nextUrl.clone();
-        cleanUrl.searchParams.delete("token");
-        const response = NextResponse.redirect(cleanUrl);
+        // Set cookie and pass through — do NOT redirect.
+        // Redirecting breaks client-side navigation (router.push) because
+        // Set-Cookie headers from redirect responses are not processed by
+        // the browser during RSC fetch requests.
+        const response = NextResponse.next();
         response.cookies.set(`admin_token_${slug}`, tokenParam, {
           sameSite: "lax",
           path: `/`,
