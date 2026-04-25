@@ -69,7 +69,6 @@ export function middleware(req: NextRequest) {
         cleanUrl.searchParams.delete("token");
         const response = NextResponse.redirect(cleanUrl);
         response.cookies.set(`admin_token_${slug}`, tokenParam, {
-          httpOnly: true,
           sameSite: "lax",
           path: `/`,
           maxAge: 60 * 60 * 24 * 90, // 90 days
