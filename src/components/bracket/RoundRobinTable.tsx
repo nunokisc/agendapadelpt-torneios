@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import MatchCard from "./MatchCard";
-import type { Match, Player, SetScore } from "@/types";
+import { computeGroupStandings } from "@/lib/standings";
+import type { Match, Player } from "@/types";
 
 interface Props {
   matches: Match[];
@@ -22,53 +23,6 @@ interface Standing {
   gamesAgainst: number;
 }
 
-function computeStandings(matches: Match[], players: Player[]): Standing[] {
-  const stats = new Map<string, Standing>();
-  for (const p of players) {
-    stats.set(p.id, {
-      player: p,
-      wins: 0, losses: 0,
-      setsFor: 0, setsAgainst: 0,
-      gamesFor: 0, gamesAgainst: 0,
-    });
-  }
-
-  for (const m of matches) {
-    if (m.status !== "completed" || !m.team1Id || !m.team2Id || !m.scores) continue;
-    const scores: SetScore[] = JSON.parse(m.scores);
-    let s1 = 0, s2 = 0, g1 = 0, g2 = 0;
-    for (const s of scores) {
-      if (s.team1 > s.team2) s1++; else s2++;
-      // Sum games within each set (excluding tie-break points)
-      g1 += s.team1;
-      g2 += s.team2;
-    }
-
-    const t1 = stats.get(m.team1Id);
-    const t2 = stats.get(m.team2Id);
-    if (t1) {
-      if (m.winnerId === m.team1Id) t1.wins++; else t1.losses++;
-      t1.setsFor += s1; t1.setsAgainst += s2;
-      t1.gamesFor += g1; t1.gamesAgainst += g2;
-    }
-    if (t2) {
-      if (m.winnerId === m.team2Id) t2.wins++; else t2.losses++;
-      t2.setsFor += s2; t2.setsAgainst += s1;
-      t2.gamesFor += g2; t2.gamesAgainst += g1;
-    }
-  }
-
-  return Array.from(stats.values()).sort((a, b) => {
-    if (b.wins !== a.wins) return b.wins - a.wins;
-    const sdA = a.setsFor - a.setsAgainst;
-    const sdB = b.setsFor - b.setsAgainst;
-    if (sdB !== sdA) return sdB - sdA;
-    const gdA = a.gamesFor - a.gamesAgainst;
-    const gdB = b.gamesFor - b.gamesAgainst;
-    return gdB - gdA;
-  });
-}
-
 export default function RoundRobinTable({ matches, players, isAdmin, onMatchClick, groupIndex }: Props) {
   const groupMatches = groupIndex !== undefined
     ? matches.filter((m) => m.groupIndex === groupIndex && m.bracketType === "group")
@@ -79,10 +33,17 @@ export default function RoundRobinTable({ matches, players, isAdmin, onMatchClic
     return players.filter((p) => ids.has(p.id));
   }, [groupMatches, players]);
 
-  const standings = useMemo(
-    () => computeStandings(groupMatches, groupPlayers),
-    [groupMatches, groupPlayers]
-  );
+  const standings = useMemo((): Standing[] => {
+    const playerIds = groupPlayers.map((p) => p.id);
+    const gs = computeGroupStandings(groupMatches, playerIds);
+    return gs
+      .map((s) => {
+        const player = groupPlayers.find((p) => p.id === s.playerId);
+        if (!player) return null;
+        return { player, wins: s.wins, losses: s.losses, setsFor: s.setsFor, setsAgainst: s.setsAgainst, gamesFor: s.gamesFor, gamesAgainst: s.gamesAgainst };
+      })
+      .filter((s): s is Standing => s !== null);
+  }, [groupMatches, groupPlayers]);
 
   // Rounds of matches
   const maxRound = Math.max(...groupMatches.map((m) => m.round), 0);

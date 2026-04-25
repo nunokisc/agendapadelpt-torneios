@@ -20,6 +20,7 @@ import { CSS } from "@dnd-kit/utilities";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
+import { parseBulkText } from "@/lib/bulk-import";
 import type { Player } from "@/types";
 
 // ─── Sortable row ─────────────────────────────────────────────────────────────
@@ -211,35 +212,6 @@ export default function PlayerList({
     } finally {
       setLoading(false);
     }
-  }
-
-  function parseBulkText(text: string): { player1: string; player2: string }[] {
-    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-    const teams: { player1: string; player2: string }[] = [];
-
-    for (const line of lines) {
-      // Format: "Player1 / Player2" or "Player1 - Player2"
-      const sep = line.includes("/") ? "/" : line.includes(" - ") ? " - " : null;
-      if (sep) {
-        const [p1, p2] = line.split(sep).map((s) => s.trim());
-        if (p1 && p2) { teams.push({ player1: p1, player2: p2 }); continue; }
-      }
-      // Format: alternating lines — pair consecutive lines
-      teams.push({ player1: line, player2: "" });
-    }
-
-    // Fix alternating format: if any player2 is empty, pair with next line
-    const result: { player1: string; player2: string }[] = [];
-    for (let i = 0; i < teams.length; i++) {
-      if (teams[i].player2 === "" && i + 1 < teams.length && teams[i + 1].player2 === "") {
-        result.push({ player1: teams[i].player1, player2: teams[i + 1].player1 });
-        i++;
-      } else if (teams[i].player2 !== "") {
-        result.push(teams[i]);
-      }
-    }
-
-    return result;
   }
 
   async function handleBulkImport() {
