@@ -1,4 +1,4 @@
-const CACHE = "padel-v3";
+const CACHE = "padel-v4";
 const PRECACHE = ["/", "/torneios"];
 
 self.addEventListener("install", (e) => {
@@ -13,6 +13,16 @@ self.addEventListener("activate", (e) => {
         Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
       )
       .then(() => self.clients.claim())
+      .then(() =>
+        // Navigate all existing clients to their current URL so they load fresh
+        // HTML with the correct content-hash chunk filenames. This works even when
+        // the old page has no controllerchange listener (i.e. old HTML from old SW).
+        self.clients.matchAll({ type: "window", includeUncontrolled: false }).then((clients) =>
+          Promise.all(
+            clients.map((client) => client.navigate(client.url))
+          )
+        )
+      )
   );
 });
 
