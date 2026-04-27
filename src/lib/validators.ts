@@ -8,6 +8,7 @@ export const createTournamentSchema = z.object({
     "double_elimination",
     "round_robin",
     "groups_knockout",
+    "fpp_auto",
   ]),
   matchFormat: z.enum(['PRO', 'PROPO', 'M3S', 'M3SPO', 'M3', 'M3PO', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'D1', 'D2', 'E', 'F']).default('M3SPO'),
   thirdPlace: z.boolean().optional().default(false),

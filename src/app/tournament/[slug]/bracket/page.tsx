@@ -105,6 +105,26 @@ export default function FullscreenBracketPage() {
         />
       );
     }
+    if (format === "fpp_auto") {
+      if ((groupCount ?? 0) > 0) {
+        return (
+          <GroupStageView
+            matches={matches}
+            players={players}
+            isAdmin={isAdmin}
+            onMatchClick={handleMatchClick}
+            groupCount={groupCount!}
+          />
+        );
+      }
+      return (
+        <SingleEliminationBracket
+          matches={matches}
+          isAdmin={isAdmin}
+          onMatchClick={handleMatchClick}
+        />
+      );
+    }
     return null;
   }
 

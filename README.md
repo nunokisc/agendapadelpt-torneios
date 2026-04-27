@@ -18,33 +18,89 @@ Plataforma web para criação e gestão de torneios de padel (duplas). Suporta m
 ## Funcionalidades
 
 ### Formatos de torneio
-- **Eliminação simples** — bracket com ou sem jogo do 3.º lugar
-- **Eliminação dupla** — winners + losers bracket com grand final
-- **Round Robin** — todos contra todos com tabela de classificação
-- **Grupos + Knockout** — fase de grupos seguida de eliminação simples
+
+| Formato | Descrição |
+|---------|-----------|
+| **Eliminação simples** | Bracket com ou sem jogo do 3.º lugar |
+| **Eliminação dupla** | Winners + losers bracket com grand final |
+| **Round Robin** | Todos contra todos com tabela de classificação |
+| **Grupos + Knockout** | Fase de grupos (manual) seguida de eliminação simples |
+| **Regulamento FPP** | Sistema automático conforme o nº de duplas confirmadas (ver abaixo) |
+
+#### Regulamento FPP — sistema automático (`fpp_auto`)
+
+Quando o bracket é gerado, o sistema escolhe automaticamente conforme o número de duplas confirmadas:
+
+| Duplas | Sistema |
+|--------|---------|
+| 4–5 | 1 grupo (round-robin) + Final |
+| 6–8 | 2 grupos + Meias-finais + Final |
+| 9–11 | 3 grupos + Quartos + Meias + Final |
+| 12+ | Quadro directo (eliminação simples) |
+
+O seeding do quadro knockout garante **zero confrontos do mesmo grupo na primeira ronda**:
+- **2 grupos** → Meias cruzadas: 1ºA vs 2ºB e 1ºB vs 2ºA
+- **3 grupos** → 1ºA e 1ºB têm bye; quartos: 2ºB-2ºC e 1ºC-2ºA
+- **4 grupos** → Quartos: 1ºA-2ºC, 1ºD-2ºB, 1ºB-2ºD, 1ºC-2ºA
+
+A distribuição de jogadores pelos grupos segue o método serpentina, produzindo grupos equilibrados para contagens ímpares (ex: 7 duplas → grupos 3+4; 10 duplas → grupos 3+3+4).
+
+---
 
 ### Formatos de jogo
+
+#### Formatos FPP (Federação Portuguesa de Padel)
+
+| Código | Descrição | Tempo est. |
+|--------|-----------|-----------|
+| **M3SPO** | 2 sets a 6 jogos No-Ad + Super Tie-Break *(default)* | ~65 min |
+| **M3S** | 2 sets a 6 jogos + Super Tie-Break | ~80 min |
+| **M3PO** | 3 sets a 6 jogos No-Ad | ~100 min |
+| **M3** | 3 sets a 6 jogos, vantagem | ~100 min |
+| **PROPO** | 1 set a 9 jogos No-Ad | ~45 min |
+| **PRO** | 1 set a 9 jogos | ~60 min |
+
+#### Formatos FFT (Fédération Française de Tennis)
+
 | Código | Descrição |
 |--------|-----------|
-| A1 / A2 | Melhor de 3 sets (6 jogos, tie-break ou normal) |
-| B1 / B2 | 2 sets + Super Tie-Break (formato padel padrão) |
-| C1 / C2 | 2 sets curtos (4 jogos) + Super Tie-Break |
-| D1 / D2 | Set único de 9 jogos |
+| A1 / A2 | Melhor de 3 sets (6 jogos, vantagem / No-Ad) |
+| B1 / B2 | 2 sets a 6 jogos + Super Tie-Break (vantagem / No-Ad) |
+| C1 / C2 | 2 sets a 4 jogos + Super Tie-Break (vantagem / No-Ad) |
+| D1 / D2 | 1 set a 9 jogos (vantagem / No-Ad) |
 | E | Super Tie-Break isolado (primeiro a 10 com 2 de vantagem) |
-| F | Set de 4 jogos sem vantagem, tie-break a 3-3 |
+| F | 1 set a 4 jogos No-Ad, tie-break a 3-3 |
+
+Os formatos FPP são aliases dos FFT: PRO≡D1, PROPO≡D2, M3S≡B1, M3SPO≡B2, M3≡A1, M3PO≡A2. O selector no formulário de criação agrupa-os em FPP e FFT.
+
+**Star Point (FIP 2026)** — checkbox opcional aplicável a qualquer formato. Até 2 vantagens alternadas são permitidas; se o marcador regressar a 40-40 pela terceira vez, o ponto seguinte é decisivo.
+
+---
 
 ### Gestão de duplas
 - Cada dupla tem **Jogador 1** e **Jogador 2** (obrigatórios) e nome de dupla opcional
 - Drag & drop para definir seeds; shuffle aleatório
 - **Importação em massa** — cola uma lista no formato `João / Maria` (um por linha) ou nomes alternados; preview em tempo real do número de duplas detectadas
 - **Check-in** — o admin marca presença por dupla antes de gerar o bracket; botões "✓ Todas" / "✗ Nenhuma" para confirmação rápida; só as duplas confirmadas entram no bracket
+- O botão **Gerar Bracket** mostra, para o formato FPP, qual o sistema que será usado com as duplas confirmadas actuais
 - **Vista pública vs admin**: sem token na URL todas as opções de edição estão ocultas; com `?token=<adminToken>` acesso total
 
 ### Resultados e scores
 - Modal de introdução de resultados com botões +/− por set (optimizado para mobile)
-- Detecção automática de vencedor de set e de jogo
+- Detecção automática de vencedor de set e de jogo com base na estrutura do formato (sem hardcoding de nomes de formatos)
 - Suporte a tie-breaks e Super Tie-Break com campos dedicados
 - Avanço automático no bracket após cada resultado
+
+### Classificação em grupos (Round Robin / Fase de Grupos)
+
+Tabela com colunas: **J** (jogos disputados), **V** (vitórias), **D** (derrotas), **SG** (sets ganhos), **SP** (sets perdidos), **SS** (saldo de sets), **JG** (jogos/games ganhos), **JP** (jogos perdidos), **SJ** (saldo de jogos).
+
+Critérios de desempate (por ordem):
+1. Vitórias
+2. Saldo de sets (SG − SP)
+3. Saldo de jogos (JG − JP)
+4. Confronto directo (h2h wins)
+5. Saldo de jogos no confronto directo
 
 ### Gestão de torneios (admin)
 - **Editar** — nome, descrição, número de campos, torneio público, inscrições abertas
@@ -113,6 +169,8 @@ Plataforma web para criação e gestão de torneios de padel (duplas). Suporta m
 ### QR Code
 - LinkShare gera QR code da ligação pública localmente (download PNG)
 
+---
+
 ## Base de dados
 
 A aplicação suporta **SQLite** e **MySQL / MariaDB**. A escolha é feita através de `DATABASE_URL` no ficheiro `.env`.
@@ -142,8 +200,10 @@ CREATE DATABASE padel_torneios CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 O script detecta o tipo de base de dados pelo prefixo do `DATABASE_URL`, patcha automaticamente o `prisma/schema.prisma` com o `provider` correcto, corre `prisma generate` e aplica as migrações:
 
-- **SQLite** → aplica os ficheiros SQL em `prisma/migrations-sqlite/` directamente via `better-sqlite3` (idempotente — salta migrações já aplicadas)
+- **SQLite** → aplica os ficheiros SQL em `prisma/migrations-sqlite/` directamente via `better-sqlite3` (idempotente — salta migrações já aplicadas; tolera colunas/tabelas já existentes)
 - **MySQL/MariaDB** → corre `prisma migrate deploy` com a migração em `prisma/migrations/`
+
+---
 
 ## Variáveis de ambiente
 
@@ -157,6 +217,8 @@ DATABASE_URL="file:./dev.db"                                        # SQLite
 
 PLATFORM_ADMIN_TOKEN=padel-admin-2025
 ```
+
+---
 
 ## Comandos
 
@@ -194,6 +256,8 @@ pm2 restart 0       # ou systemctl restart / outro gestor de processos
 
 > **Nota**: `db:setup` deve correr **antes** de `build` para garantir que o Prisma client está actualizado com o schema mais recente.
 
+---
+
 ## Estrutura do projecto
 
 ```
@@ -212,9 +276,9 @@ src/
 │   │       ├── route.ts                  # POST /api/tournament (criar)
 │   │       └── [slug]/
 │   │           ├── route.ts              # GET / PATCH / DELETE torneio
-│   │           ├── generate/route.ts     # POST gerar bracket (filtra checkedIn)
-│   │           ├── players/route.ts      # POST/PUT/PATCH/DELETE duplas
-│   │           ├── match/[matchId]/      # PUT introduzir resultado
+│   │           ├── generate/route.ts     # POST gerar bracket (filtra checkedIn; suporta fpp_auto)
+│   │           ├── players/route.ts      # POST/PUT/PATCH/DELETE duplas + check-in
+│   │           ├── match/[matchId]/      # PUT introduzir resultado; gera knockout ao terminar grupos
 │   │           ├── clone/route.ts        # POST clonar torneio
 │   │           ├── register/route.ts     # GET/POST/PATCH inscrições
 │   │           ├── schedule/route.ts     # PATCH/POST agenda de jogos
@@ -231,11 +295,11 @@ src/
 │   │   ├── MatchCard.tsx                 # Cartão de jogo (destaque vencedor)
 │   │   ├── SingleEliminationBracket.tsx  # Vista desktop + tabs mobile por ronda
 │   │   ├── DoubleEliminationBracket.tsx  # Winners/Losers/Final com tabs mobile
-│   │   ├── RoundRobinTable.tsx           # Tabela de classificação + jogos por ronda
+│   │   ├── RoundRobinTable.tsx           # Classificação (J/V/D/SG/SP/SS/JG/JP/SJ) + jogos
 │   │   ├── GroupStageView.tsx            # Grupos com tabs mobile
 │   │   └── BracketConnector.tsx          # Linhas SVG entre jogos
 │   ├── tournament/
-│   │   ├── CreateTournamentForm.tsx
+│   │   ├── CreateTournamentForm.tsx      # Selector agrupado FPP/FFT; starPoint; fpp_auto
 │   │   ├── PlayerList.tsx                # Duplas: drag & drop, bulk import, check-in
 │   │   ├── MyTournaments.tsx             # Painel localStorage
 │   │   ├── ScoreInputModal.tsx           # Introdução de resultados com +/− buttons
@@ -249,19 +313,21 @@ src/
 │       ├── TournamentBottomNav.tsx        # Bottom nav fixo em mobile
 │       └── PwaRegister.tsx               # Registo do service worker
 ├── lib/
-│   ├── bracket-engine.ts                 # generateSingleElimination, etc.
-│   ├── scoring.ts                        # determineSetWinner, validateScores
-│   ├── standings.ts                      # computeGroupStandings (com h2h tiebreaker)
+│   ├── bracket-engine.ts                 # generateSingleElimination / RR / Groups / DE
+│   ├── fpp-bracket.ts                    # getFPPConfig (sistema por nº duplas) + fppKnockoutOrder
+│   ├── scoring.ts                        # Formatos FPP + FFT; determineSetWinner; validateScores
+│   ├── standings.ts                      # computeGroupStandings (5 critérios de desempate)
 │   ├── bulk-import.ts                    # parseBulkText — parser de importação em massa
 │   ├── my-tournaments.ts                 # localStorage helpers
-│   ├── validators.ts                     # Zod schemas
+│   ├── validators.ts                     # Zod schemas (todos os formatos FPP+FFT; starPoint)
 │   └── db.ts / slug.ts / utils.ts / seeding.ts / round-robin.ts
 ├── __tests__/
-│   ├── scoring.test.ts                   # 70+ testes de scoring por formato
+│   ├── scoring.test.ts                   # 70+ testes de scoring por formato (FFT + FPP)
 │   ├── bracket-engine.test.ts            # Testes de geração de brackets
 │   ├── standings.test.ts                 # Testes de classificação com h2h
-│   └── bulk-import.test.ts              # Testes do parser de importação em massa
-└── types/index.ts                        # Tournament, Player, Match, Registration, etc.
+│   ├── bulk-import.test.ts               # Testes do parser de importação em massa
+│   └── fpp-bracket.test.ts               # Testes de getFPPConfig e fppKnockoutOrder
+└── types/index.ts                        # Tournament, Player, Match, Registration, MatchFormat
 
 prisma/
 ├── schema.prisma                         # patchado pelo db:setup (provider varia)
@@ -272,7 +338,8 @@ prisma/
     ├── 20260423_scoring/
     ├── 20260424_doubles/
     ├── 20260424_features/
-    └── 20260425_checkin/
+    ├── 20260425_checkin/
+    └── 20260426_starpoint/
 
 scripts/
 ├── setup-db.mjs                          # Cria/actualiza DB e aplica migrations (idempotente)
@@ -283,18 +350,22 @@ public/
 └── sw.js                                 # Service worker PWA
 ```
 
+---
+
 ## Schema da base de dados
 
 ```prisma
 model Tournament {
   slug             String   @unique
   adminToken       String   @unique
-  format           String   // single_elimination | double_elimination | round_robin | groups_knockout
-  matchFormat      String   @default("B1")
-  status           String   @default("draft") // draft | in_progress | completed
+  format           String   // single_elimination | double_elimination | round_robin
+                            // | groups_knockout | fpp_auto
+  matchFormat      String   @default("M3SPO")  // código FPP ou FFT (ver tabela de formatos)
+  starPoint        Boolean  @default(false)     // Star Point FIP 2026 (ponto de ouro a 40-40)
+  status           String   @default("draft")  // draft | in_progress | completed
   thirdPlace       Boolean  @default(false)
-  groupCount       Int?
-  advanceCount     Int?
+  groupCount       Int?     // nº de grupos; para fpp_auto é preenchido ao gerar
+  advanceCount     Int?     // duplas que avançam por grupo
   isPublic         Boolean  @default(false)
   registrationOpen Boolean  @default(false)
   courtCount       Int?
@@ -305,7 +376,7 @@ model Player {              // representa uma dupla
   player1Name  String      // nome do primeiro jogador
   player2Name  String      // nome do segundo jogador
   seed         Int?
-  checkedIn    Boolean     @default(true)   // check-in de presença; só entra no bracket se true
+  checkedIn    Boolean     @default(true)   // só entra no bracket se true
   groupIndex   Int?
 }
 
@@ -317,7 +388,7 @@ model Match {
   team1Id          String?
   team2Id          String?
   winnerId         String?
-  scores           String?   // JSON: SetScore[]
+  scores           String?   // JSON: SetScore[] — ex: [{"team1":6,"team2":4},{"team1":7,"team2":6,"tiebreak":{"team1":7,"team2":3}}]
   scheduledAt      DateTime?
   court            String?
   status           String    // pending | in_progress | completed | bye
@@ -335,6 +406,8 @@ model Registration {
 }
 ```
 
+---
+
 ## Dados de demonstração
 
 Após `npm run db:reset`:
@@ -350,9 +423,11 @@ Após `npm run db:reset`:
 
 Painel global: `/admin?token=padel-admin-2025`
 
+---
+
 ## Notas de implementação
 
-**Quirk do Prisma + better-sqlite3**: `prisma migrate deploy` não funciona com o adapter better-sqlite3. Para SQLite, o script `db:setup` aplica as migrations directamente via `better-sqlite3` e regista-as em `_prisma_migrations` manualmente. Para MySQL, usa `prisma migrate deploy` normalmente.
+**Quirk do Prisma + better-sqlite3**: `prisma migrate deploy` não funciona com o adapter better-sqlite3. Para SQLite, o script `db:setup` aplica as migrations directamente via `better-sqlite3` e regista-as em `_prisma_migrations` manualmente. Para MySQL, usa `prisma migrate deploy` normalmente. O script é idempotente: salta migrações já aplicadas e tolera erros de "duplicate column name" / "table already exists" (regista a migração como aplicada).
 
 **Adicionar uma nova migration:**
 | | SQLite | MySQL |
@@ -362,9 +437,13 @@ Painel global: `/admin?token=padel-admin-2025`
 | Setup script | Adicionar ao array `migrations` em `scripts/setup-db.mjs` | N/A |
 | Gerar client | `npm run db:setup` | Idem |
 
-**Standings (classificação de grupos)**: a função `computeGroupStandings` em `src/lib/standings.ts` é a única fonte de verdade — usada tanto pela tabela visual (`RoundRobinTable`) como pelo servidor quando avança jogadores dos grupos para o knockout. Os critérios de desempate são: vitórias → diferença de sets → diferença de jogos → confronto directo.
+**Formatos de jogo (scoring)**: `src/lib/scoring.ts` é a fonte de verdade para toda a lógica de validação e determinação de vencedor. Os formatos FPP (PRO, PROPO, M3S, M3SPO, M3, M3PO) são aliases dos FFT equivalentes — `getFormatStructure` delega para o formato FFT correspondente. A detecção do Super Tie-Break é feita por `structure[i].type === "superTiebreak"`, nunca por nome de formato.
 
-**Geração do bracket de Grupos+Knockout**: quando o último jogo de grupo é registado, o servidor computa automaticamente as classificações e gera o bracket de eliminação, dentro da mesma transacção Prisma.
+**Standings (classificação de grupos)**: `computeGroupStandings` em `src/lib/standings.ts` é a única fonte de verdade — usada pela tabela visual (`RoundRobinTable`) e pelo servidor ao avançar jogadores para o knockout. Critérios: vitórias → saldo sets → saldo jogos → h2h wins → saldo jogos h2h. Inclui contador `played` para a coluna J.
+
+**Formato FPP automático (`fpp_auto`)**: o formato é apenas uma etiqueta guardada no torneio. O sistema de grupos (1, 2 ou 3 grupos, ou eliminação directa) é determinado em `src/lib/fpp-bracket.ts → getFPPConfig(playerCount)` **no momento de gerar o bracket**, quando o número de duplas confirmadas é conhecido. O seeding cross-grupo (`fppKnockoutOrder`) garante que nenhum par do mesmo grupo se cruza na primeira ronda do knockout.
+
+**Geração do bracket de Grupos+Knockout**: quando o último jogo de grupo é registado, o servidor computa automaticamente as classificações e gera o bracket de eliminação dentro da mesma transacção Prisma. Para `fpp_auto` usa `fppKnockoutOrder`; para `groups_knockout` manual usa o seeding legacy.
 
 **SSR e localStorage**: componentes que dependem de `localStorage` usam um estado `ready` inicializado a `false` para evitar hydration mismatch.
 

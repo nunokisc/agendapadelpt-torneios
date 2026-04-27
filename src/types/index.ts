@@ -2,7 +2,8 @@ export type TournamentFormat =
   | "single_elimination"
   | "double_elimination"
   | "round_robin"
-  | "groups_knockout";
+  | "groups_knockout"
+  | "fpp_auto";
 
 export type TournamentStatus = "draft" | "in_progress" | "completed";
 

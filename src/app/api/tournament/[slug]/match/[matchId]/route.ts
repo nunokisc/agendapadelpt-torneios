@@ -4,6 +4,7 @@ import { scoreSchema } from "@/lib/validators";
 import { determineMatchWinner, validateScores } from "@/lib/scoring";
 import { generateSingleElimination } from "@/lib/bracket-engine";
 import { computeGroupStandings } from "@/lib/standings";
+import { fppKnockoutOrder } from "@/lib/fpp-bracket";
 import { broadcastUpdate } from "@/lib/sse";
 import { extractAdminToken } from "@/lib/auth-server";
 import type { SetScore, MatchFormat } from "@/types";
@@ -62,7 +63,7 @@ export async function PUT(
   }
 
   const scores: SetScore[] = parsed.data.scores;
-  const matchFormat = (tournament.matchFormat || "B1") as MatchFormat;
+  const matchFormat = (tournament.matchFormat || "M3SPO") as MatchFormat;
 
   const validation = validateScores(scores, matchFormat);
   if (!validation.valid) {
@@ -103,8 +104,8 @@ export async function PUT(
       });
     }
 
-    // 4. For groups_knockout: when all group matches finish, auto-generate knockout bracket
-    if (tournament.format === "groups_knockout" && match.bracketType === "group") {
+    // 4. For groups_knockout / fpp_auto: when all group matches finish, generate knockout
+    if ((tournament.format === "groups_knockout" || tournament.format === "fpp_auto") && match.bracketType === "group") {
       const allGroupMatches = await tx.match.findMany({
         where: { tournamentId: tournament.id, bracketType: "group" },
         select: { status: true, team1Id: true, team2Id: true, winnerId: true, scores: true, groupIndex: true },
@@ -141,15 +142,21 @@ export async function PUT(
             }
           }
 
-          // Cross-group interleaving: 1sts in order, 2nds reversed
-          // This ensures G0-1st vs G(last)-2nd, G1-1st vs G(last-1)-2nd, etc.
-          const advancingPlayers: string[] = [];
-          for (let pos = 0; pos < advanceCount; pos++) {
-            const group = advancingByPosition[pos];
-            if (pos % 2 === 0) {
-              advancingPlayers.push(...group.map((g) => g.playerId));
-            } else {
-              advancingPlayers.push(...group.reverse().map((g) => g.playerId));
+          // Seeding order for knockout bracket
+          // fpp_auto uses FPP cross-group rules (no same-group R1 matchups)
+          // groups_knockout uses legacy alternating-reverse order
+          let advancingPlayers: string[];
+          if (tournament.format === "fpp_auto") {
+            advancingPlayers = fppKnockoutOrder(advancingByPosition, groupCount);
+          } else {
+            advancingPlayers = [];
+            for (let pos = 0; pos < advanceCount; pos++) {
+              const group = advancingByPosition[pos];
+              if (pos % 2 === 0) {
+                advancingPlayers.push(...group.map((g) => g.playerId));
+              } else {
+                advancingPlayers.push(...group.reverse().map((g) => g.playerId));
+              }
             }
           }
 

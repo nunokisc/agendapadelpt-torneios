@@ -18,6 +18,7 @@ import DoubleEliminationBracket from "@/components/bracket/DoubleEliminationBrac
 import RoundRobinTable from "@/components/bracket/RoundRobinTable";
 import GroupStageView from "@/components/bracket/GroupStageView";
 import Button from "@/components/ui/Button";
+import { getFPPConfig } from "@/lib/fpp-bracket";
 import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/ToastProvider";
 import { BracketSkeleton } from "@/components/ui/Skeleton";
@@ -186,7 +187,8 @@ export default function TournamentPage() {
 
   const { tournament } = data;
   const isDraft = tournament.status === "draft";
-  const canGenerate = isDraft && tournament.players.length >= 2;
+  const checkedInPlayers = tournament.players.filter((p) => p.checkedIn);
+  const canGenerate = isDraft && checkedInPlayers.length >= 2;
   const bracketUrl = token ? `/tournament/${slug}/bracket?token=${token}` : `/tournament/${slug}/bracket`;
 
   function renderBracket() {
@@ -195,6 +197,12 @@ export default function TournamentPage() {
     if (format === "double_elimination") return <DoubleEliminationBracket matches={matches} isAdmin={isAdmin} onMatchClick={handleMatchClick} />;
     if (format === "round_robin") return <RoundRobinTable matches={matches} players={players} isAdmin={isAdmin} onMatchClick={handleMatchClick} />;
     if (format === "groups_knockout") return <GroupStageView matches={matches} players={players} isAdmin={isAdmin} onMatchClick={handleMatchClick} groupCount={groupCount ?? 2} />;
+    if (format === "fpp_auto") {
+      if ((groupCount ?? 0) > 0) {
+        return <GroupStageView matches={matches} players={players} isAdmin={isAdmin} onMatchClick={handleMatchClick} groupCount={groupCount!} />;
+      }
+      return <SingleEliminationBracket matches={matches} isAdmin={isAdmin} onMatchClick={handleMatchClick} />;
+    }
     return null;
   }
 
@@ -263,7 +271,18 @@ export default function TournamentPage() {
                 <Button size="lg" className="w-full" disabled={!canGenerate} loading={generating} onClick={handleGenerate}>
                   Gerar Bracket
                 </Button>
-                {!canGenerate && <p className="text-xs text-center text-slate-400">Precisas de pelo menos 2 duplas.</p>}
+                {tournament.format === "fpp_auto" && (
+                  <p className="text-xs text-center text-slate-500 dark:text-slate-400">
+                    {checkedInPlayers.length >= 2
+                      ? <>FPP: {getFPPConfig(checkedInPlayers.length).description}</>
+                      : "Regulamento FPP — o sistema é escolhido quando gerado"}
+                  </p>
+                )}
+                {!canGenerate && (
+                  <p className="text-xs text-center text-slate-400">
+                    Precisas de pelo menos 2 duplas confirmadas.
+                  </p>
+                )}
               </>
             )}
           </div>

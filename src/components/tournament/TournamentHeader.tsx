@@ -16,6 +16,7 @@ const FORMAT_LABELS: Record<string, string> = {
   double_elimination: "Eliminação Dupla",
   round_robin: "Round Robin",
   groups_knockout: "Grupos + Eliminação",
+  fpp_auto: "Regulamento FPP",
 };
 
 const STATUS_VARIANT: Record<string, "default" | "info" | "success"> = {

@@ -10,10 +10,11 @@ import type { TournamentFormat, MatchFormat } from "@/types";
 import { saveTournament } from "@/lib/my-tournaments";
 
 const FORMAT_OPTIONS = [
+  { value: "fpp_auto", label: "Regulamento FPP (automático por nº de duplas)" },
   { value: "single_elimination", label: "Eliminação Simples" },
   { value: "double_elimination", label: "Eliminação Dupla" },
   { value: "round_robin", label: "Todos contra Todos (Round Robin)" },
-  { value: "groups_knockout", label: "Fase de Grupos + Eliminação" },
+  { value: "groups_knockout", label: "Fase de Grupos + Eliminação (manual)" },
 ];
 
 const MATCH_FORMAT_GROUPS: { label: string; options: { value: MatchFormat; label: string }[] }[] = [
@@ -57,6 +58,33 @@ const ADVANCE_OPTIONS = [
   { value: 4, label: "4 por grupo" },
 ];
 
+const FPP_BRACKETS = [
+  { range: "4–5 duplas",  system: "1 grupo (round-robin) + Final" },
+  { range: "6–8 duplas",  system: "2 grupos + Meias + Final" },
+  { range: "9–11 duplas", system: "3 grupos + Quartos + Meias + Final" },
+  { range: "12+ duplas",  system: "Quadro directo (eliminação simples)" },
+];
+
+function FPPAutoInfo() {
+  return (
+    <div className="mt-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2.5 text-xs text-emerald-800 dark:text-emerald-300">
+      <p className="font-semibold mb-1">Regulamento FPP — sistema automático</p>
+      <p className="mb-1.5 text-emerald-700 dark:text-emerald-400">
+        Cria o torneio e adiciona as duplas. Quando clicares em &ldquo;Gerar Bracket&rdquo;,
+        o sistema escolhe automaticamente conforme o número de duplas confirmadas:
+      </p>
+      <ul className="space-y-0.5">
+        {FPP_BRACKETS.map((b) => (
+          <li key={b.range} className="flex gap-2">
+            <span className="w-20 shrink-0 font-mono">{b.range}</span>
+            <span className="text-emerald-700 dark:text-emerald-400">{b.system}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function CreateTournamentForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -73,6 +101,7 @@ export default function CreateTournamentForm() {
   const [courtCount, setCourtCount] = useState<string>("");
 
   const isGroups = format === "groups_knockout";
+  const isFPPAuto = format === "fpp_auto";
   const isSingle = format === "single_elimination";
 
   async function handleSubmit(e: React.FormEvent) {
@@ -91,7 +120,7 @@ export default function CreateTournamentForm() {
         format,
         matchFormat,
         starPoint,
-        thirdPlace: isSingle ? thirdPlace : false,
+        thirdPlace: (isSingle || isFPPAuto) ? thirdPlace : false,
         courtCount: courtCount !== "" ? Number(courtCount) : 1,
       };
       if (isGroups) {
@@ -156,12 +185,17 @@ export default function CreateTournamentForm() {
           />
         </div>
 
-        <Select
-          label="Formato do torneio"
-          options={FORMAT_OPTIONS}
-          value={format}
-          onChange={(e) => setFormat(e.target.value as TournamentFormat)}
-        />
+        <div className="flex flex-col gap-1">
+          <Select
+            label="Formato do torneio"
+            options={FORMAT_OPTIONS}
+            value={format}
+            onChange={(e) => setFormat(e.target.value as TournamentFormat)}
+          />
+          {isFPPAuto && (
+            <FPPAutoInfo />
+          )}
+        </div>
 
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -196,7 +230,7 @@ export default function CreateTournamentForm() {
           </span>
         </label>
 
-        {isSingle && (
+        {(isSingle || isFPPAuto) && (
           <label className="flex items-center gap-3 cursor-pointer">
             <input
               type="checkbox"

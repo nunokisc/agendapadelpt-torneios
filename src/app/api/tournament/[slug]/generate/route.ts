@@ -6,6 +6,7 @@ import {
   generateGroupsKnockout,
   generateDoubleElimination,
 } from "@/lib/bracket-engine";
+import { getFPPConfig } from "@/lib/fpp-bracket";
 import { broadcastUpdate } from "@/lib/sse";
 import { extractAdminToken } from "@/lib/auth-server";
 
@@ -40,6 +41,8 @@ export async function POST(
   }
 
   let matchInputs: ReturnType<typeof generateSingleElimination> = [];
+  let fppGroupCount: number | null = null;
+  let fppAdvanceCount: number | null = null;
 
   switch (tournament.format) {
     case "single_elimination":
@@ -55,6 +58,18 @@ export async function POST(
       const gc = tournament.groupCount ?? 2;
       const { groupMatches } = generateGroupsKnockout(players.length, gc);
       matchInputs = groupMatches;
+      break;
+    }
+    case "fpp_auto": {
+      const config = getFPPConfig(players.length);
+      if (config.isDirectElimination) {
+        matchInputs = generateSingleElimination(players.length, tournament.thirdPlace);
+      } else {
+        const { groupMatches } = generateGroupsKnockout(players.length, config.groupCount);
+        matchInputs = groupMatches;
+        fppGroupCount = config.groupCount;
+        fppAdvanceCount = config.advanceCount;
+      }
       break;
     }
   }
@@ -116,7 +131,11 @@ export async function POST(
 
     await tx.tournament.update({
       where: { id: tournament.id },
-      data: { status: "in_progress" },
+      data: {
+        status: "in_progress",
+        ...(fppGroupCount !== null && { groupCount: fppGroupCount }),
+        ...(fppAdvanceCount !== null && { advanceCount: fppAdvanceCount }),
+      },
     });
 
     return created;
