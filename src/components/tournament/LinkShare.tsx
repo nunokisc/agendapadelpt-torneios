@@ -99,6 +99,7 @@ export default function LinkShare({ slug, adminToken }: LinkShareProps) {
 
         {showQr && qrDataUrl && (
           <div className="flex items-center gap-4 pt-2 border-t border-slate-100 dark:border-slate-700">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={qrDataUrl} alt="QR Code" className="w-24 h-24 rounded-lg border border-slate-200 dark:border-slate-700" />
             <div>
               <p className="text-sm font-medium text-slate-700 dark:text-slate-300">QR Code público</p>
