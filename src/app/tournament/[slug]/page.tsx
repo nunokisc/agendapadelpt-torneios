@@ -281,6 +281,24 @@ export default function TournamentPage() {
     setSelectedMatch(match);
   }
 
+  async function handleMatchStart(matchId: string, startedAtHHMM: string) {
+    if (!isAdmin) return;
+    try {
+      const [h, m] = startedAtHHMM.split(":").map(Number);
+      const startedAt = new Date();
+      startedAt.setHours(h, m, 0, 0);
+      const res = await fetch(`/api/tournament/${slug}/match/${matchId}?token=${token}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startedAt: startedAt.toISOString() }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Erro ao iniciar jogo");
+      fetchData();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Erro ao iniciar jogo");
+    }
+  }
+
   if (loading) return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="h-16 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-xl mb-6" />
@@ -325,24 +343,24 @@ export default function TournamentPage() {
     const catFormat = activeCategory.format ?? tournamentFormat;
 
     if (catFormat === "single_elimination") {
-      return <SingleEliminationBracket matches={catMatches} isAdmin={isAdmin} onMatchClick={handleMatchClick} />;
+      return <SingleEliminationBracket matches={catMatches} isAdmin={isAdmin} onMatchClick={handleMatchClick} onMatchStart={handleMatchStart} />;
     }
     if (catFormat === "double_elimination") {
-      return <DoubleEliminationBracket matches={catMatches} isAdmin={isAdmin} onMatchClick={handleMatchClick} />;
+      return <DoubleEliminationBracket matches={catMatches} isAdmin={isAdmin} onMatchClick={handleMatchClick} onMatchStart={handleMatchStart} />;
     }
     if (catFormat === "round_robin") {
-      return <RoundRobinTable matches={catMatches} players={catPlayers} isAdmin={isAdmin} onMatchClick={handleMatchClick} />;
+      return <RoundRobinTable matches={catMatches} players={catPlayers} isAdmin={isAdmin} onMatchClick={handleMatchClick} onMatchStart={handleMatchStart} />;
     }
     if (catFormat === "groups_knockout") {
       const gc = activeCategory.groupCount ?? tournamentGroupCount ?? 2;
-      return <GroupStageView matches={catMatches} players={catPlayers} isAdmin={isAdmin} onMatchClick={handleMatchClick} groupCount={gc} />;
+      return <GroupStageView matches={catMatches} players={catPlayers} isAdmin={isAdmin} onMatchClick={handleMatchClick} onMatchStart={handleMatchStart} groupCount={gc} />;
     }
     if (catFormat === "fpp_auto" || (!catFormat && tournamentFormat === "fpp_auto")) {
       const gc = activeCategory.groupCount ?? tournamentGroupCount ?? 0;
       if (gc > 0) {
-        return <GroupStageView matches={catMatches} players={catPlayers} isAdmin={isAdmin} onMatchClick={handleMatchClick} groupCount={gc} />;
+        return <GroupStageView matches={catMatches} players={catPlayers} isAdmin={isAdmin} onMatchClick={handleMatchClick} onMatchStart={handleMatchStart} groupCount={gc} />;
       }
-      return <SingleEliminationBracket matches={catMatches} isAdmin={isAdmin} onMatchClick={handleMatchClick} />;
+      return <SingleEliminationBracket matches={catMatches} isAdmin={isAdmin} onMatchClick={handleMatchClick} onMatchStart={handleMatchStart} />;
     }
     return null;
   }

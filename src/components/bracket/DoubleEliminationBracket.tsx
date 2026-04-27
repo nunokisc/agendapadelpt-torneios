@@ -9,11 +9,12 @@ interface Props {
   matches: Match[];
   isAdmin: boolean;
   onMatchClick: (match: Match) => void;
+  onMatchStart?: (matchId: string, startedAt: string) => void;
 }
 
 type Section = "winners" | "losers" | "final";
 
-export default function DoubleEliminationBracket({ matches, isAdmin, onMatchClick }: Props) {
+export default function DoubleEliminationBracket({ matches, isAdmin, onMatchClick, onMatchStart }: Props) {
   const winners = matches.filter((m) => m.bracketType === "winners");
   const losers = matches
     .filter((m) => m.bracketType === "losers")
@@ -56,7 +57,7 @@ export default function DoubleEliminationBracket({ matches, isAdmin, onMatchClic
         </div>
 
         {mobileSection === "winners" && (
-          <SingleEliminationBracket matches={winners} isAdmin={isAdmin} onMatchClick={onMatchClick} />
+          <SingleEliminationBracket matches={winners} isAdmin={isAdmin} onMatchClick={onMatchClick} onMatchStart={onMatchStart} />
         )}
         {mobileSection === "losers" && losers.length > 0 && (
           <div className="space-y-3">
@@ -64,7 +65,7 @@ export default function DoubleEliminationBracket({ matches, isAdmin, onMatchClic
               <div key={r} className="space-y-2">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Losers L{r}</p>
                 {(losersByRound.get(r) ?? []).map((m) => (
-                  <MatchCard key={m.id} match={m} isAdmin={isAdmin} onClick={() => onMatchClick(m)} compact />
+                  <MatchCard key={m.id} match={m} isAdmin={isAdmin} onClick={() => onMatchClick(m)} onStart={onMatchStart} compact />
                 ))}
               </div>
             ))}
@@ -74,7 +75,7 @@ export default function DoubleEliminationBracket({ matches, isAdmin, onMatchClic
           <div className="space-y-2">
             <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Grand Final</p>
             {finals.map((m) => (
-              <MatchCard key={m.id} match={m} isAdmin={isAdmin} onClick={() => onMatchClick(m)} compact />
+              <MatchCard key={m.id} match={m} isAdmin={isAdmin} onClick={() => onMatchClick(m)} onStart={onMatchStart} />
             ))}
           </div>
         )}
@@ -84,7 +85,7 @@ export default function DoubleEliminationBracket({ matches, isAdmin, onMatchClic
       <div className="hidden sm:block space-y-8">
         <div>
           <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Winners Bracket</h4>
-          <SingleEliminationBracket matches={winners} isAdmin={isAdmin} onMatchClick={onMatchClick} />
+          <SingleEliminationBracket matches={winners} isAdmin={isAdmin} onMatchClick={onMatchClick} onMatchStart={onMatchStart} />
         </div>
         {losers.length > 0 && (
           <div>
@@ -94,7 +95,7 @@ export default function DoubleEliminationBracket({ matches, isAdmin, onMatchClic
                 <div key={r} className="flex flex-col gap-3 shrink-0">
                   <div className="text-xs text-center text-slate-400 mb-1">L{r}</div>
                   {(losersByRound.get(r) ?? []).map((m) => (
-                    <MatchCard key={m.id} match={m} isAdmin={isAdmin} onClick={() => onMatchClick(m)} />
+                    <MatchCard key={m.id} match={m} isAdmin={isAdmin} onClick={() => onMatchClick(m)} onStart={onMatchStart} />
                   ))}
                 </div>
               ))}
@@ -106,7 +107,7 @@ export default function DoubleEliminationBracket({ matches, isAdmin, onMatchClic
             <h4 className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-3">Grand Final</h4>
             <div className="flex gap-4">
               {finals.map((m) => (
-                <MatchCard key={m.id} match={m} isAdmin={isAdmin} onClick={() => onMatchClick(m)} />
+                <MatchCard key={m.id} match={m} isAdmin={isAdmin} onClick={() => onMatchClick(m)} onStart={onMatchStart} />
               ))}
             </div>
           </div>

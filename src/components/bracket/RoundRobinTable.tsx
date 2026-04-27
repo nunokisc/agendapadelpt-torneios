@@ -10,6 +10,7 @@ interface Props {
   players: Player[];
   isAdmin: boolean;
   onMatchClick: (match: Match) => void;
+  onMatchStart?: (matchId: string, startedAt: string) => void;
   groupIndex?: number;
 }
 
@@ -24,7 +25,7 @@ interface Standing {
   gamesAgainst: number;
 }
 
-export default function RoundRobinTable({ matches, players, isAdmin, onMatchClick, groupIndex }: Props) {
+export default function RoundRobinTable({ matches, players, isAdmin, onMatchClick, onMatchStart, groupIndex }: Props) {
   const groupMatches = groupIndex !== undefined
     ? matches.filter((m) => m.groupIndex === groupIndex && m.bracketType === "group")
     : matches.filter((m) => m.bracketType === "group");
@@ -123,6 +124,7 @@ export default function RoundRobinTable({ matches, players, isAdmin, onMatchClic
                   match={m}
                   isAdmin={isAdmin}
                   onClick={() => onMatchClick(m)}
+                  onStart={onMatchStart}
                   compact
                 />
               ))}

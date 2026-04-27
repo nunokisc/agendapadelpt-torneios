@@ -10,10 +10,11 @@ interface Props {
   players: Player[];
   isAdmin: boolean;
   onMatchClick: (match: Match) => void;
+  onMatchStart?: (matchId: string, startedAt: string) => void;
   groupCount: number;
 }
 
-export default function GroupStageView({ matches, players, isAdmin, onMatchClick, groupCount }: Props) {
+export default function GroupStageView({ matches, players, isAdmin, onMatchClick, onMatchStart, groupCount }: Props) {
   const groupMatches = matches.filter((m) => m.bracketType === "group");
   const knockoutMatches = matches.filter((m) => m.bracketType === "winners" || m.bracketType === "third_place");
   const hasKnockout = knockoutMatches.length > 0;
@@ -73,6 +74,7 @@ export default function GroupStageView({ matches, players, isAdmin, onMatchClick
               players={players}
               isAdmin={isAdmin}
               onMatchClick={onMatchClick}
+              onMatchStart={onMatchStart}
               groupIndex={mobileTab}
             />
           </div>
@@ -81,12 +83,12 @@ export default function GroupStageView({ matches, players, isAdmin, onMatchClick
             <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-3 uppercase tracking-wide">
               Fase de Eliminação
             </h4>
-            <SingleEliminationBracket matches={knockoutMatches} isAdmin={isAdmin} onMatchClick={onMatchClick} />
+            <SingleEliminationBracket matches={knockoutMatches} isAdmin={isAdmin} onMatchClick={onMatchClick} onMatchStart={onMatchStart} />
           </div>
         )}
       </div>
 
-      {/* ── Desktop: full grid ── */}
+      {/* ── Desktop: full grid ── */}}
       <div className="hidden sm:block space-y-8">
         <div>
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4">Fase de Grupos</h3>
@@ -101,6 +103,7 @@ export default function GroupStageView({ matches, players, isAdmin, onMatchClick
                   players={players}
                   isAdmin={isAdmin}
                   onMatchClick={onMatchClick}
+                  onMatchStart={onMatchStart}
                   groupIndex={g}
                 />
               </div>
@@ -112,7 +115,7 @@ export default function GroupStageView({ matches, players, isAdmin, onMatchClick
           <div>
             <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4">Fase de Eliminação</h3>
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4 overflow-x-auto">
-              <SingleEliminationBracket matches={knockoutMatches} isAdmin={isAdmin} onMatchClick={onMatchClick} />
+              <SingleEliminationBracket matches={knockoutMatches} isAdmin={isAdmin} onMatchClick={onMatchClick} onMatchStart={onMatchStart} />
             </div>
           </div>
         )}

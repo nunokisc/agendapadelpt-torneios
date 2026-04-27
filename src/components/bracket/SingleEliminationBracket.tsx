@@ -16,6 +16,7 @@ interface Props {
   matches: Match[];
   isAdmin: boolean;
   onMatchClick: (match: Match) => void;
+  onMatchStart?: (matchId: string, startedAt: string) => void;
 }
 
 function getRoundName(round: number, totalRounds: number): string {
@@ -26,7 +27,7 @@ function getRoundName(round: number, totalRounds: number): string {
   return `Ronda ${round}`;
 }
 
-export default function SingleEliminationBracket({ matches, isAdmin, onMatchClick }: Props) {
+export default function SingleEliminationBracket({ matches, isAdmin, onMatchClick, onMatchStart }: Props) {
   const [mobileRound, setMobileRound] = useState(1);
   const { rounds, positions, svgConnectors, totalWidth, totalHeight } = useMemo(() => {
     const winners = matches.filter((m) => m.bracketType === "winners");
@@ -202,6 +203,7 @@ export default function SingleEliminationBracket({ matches, isAdmin, onMatchClic
                 match={m}
                 isAdmin={isAdmin}
                 onClick={() => onMatchClick(m)}
+                onStart={onMatchStart}
                 highlight={winnerPathIds.has(m.id)}
                 compact
               />
@@ -269,6 +271,7 @@ export default function SingleEliminationBracket({ matches, isAdmin, onMatchClic
                 match={m}
                 isAdmin={isAdmin}
                 onClick={() => onMatchClick(m)}
+                onStart={onMatchStart}
                 highlight={winnerPathIds.has(m.id)}
               />
             </div>

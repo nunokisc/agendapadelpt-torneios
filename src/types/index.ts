@@ -66,6 +66,8 @@ export interface Tournament {
   groupCount: number | null;
   advanceCount: number | null;
   courtCount: number | null;
+  slotMinutes: number | null;
+  scheduleDays: string | null;
   isPublic: boolean;
   registrationOpen: boolean;
   createdAt: Date;
@@ -116,6 +118,7 @@ export interface Match {
   scores: string | null;
   scheduledAt: Date | null;
   court: string | null;
+  startedAt: Date | null;
   status: MatchStatus;
   nextMatchId: string | null;
   nextMatchSlot: number | null;

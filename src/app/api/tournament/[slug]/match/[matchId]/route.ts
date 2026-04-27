@@ -76,6 +76,60 @@ export async function PUT(
       include: { team1: true, team2: true, winner: true },
     });
 
+    // 1b. Delay-push: if the match had a startedAt and the court has remaining
+    //     pending matches scheduled after this one, push them by the overshoot.
+    if (match.startedAt && match.court && match.scheduledAt) {
+      const slotMs = (tournament.slotMinutes ?? 90) * 60 * 1000;
+      const actualDuration = Date.now() - new Date(match.startedAt).getTime();
+      const delayMs = actualDuration - slotMs;
+
+      if (delayMs > 0) {
+        // Parse day windows for hard-stop enforcement
+        type DayWindow = { date: string; startTime: string; endTime: string };
+        const scheduleDays: DayWindow[] = tournament.scheduleDays
+          ? (JSON.parse(tournament.scheduleDays) as DayWindow[])
+          : [];
+
+        // Build end-of-day timestamps keyed by YYYY-MM-DD
+        const endOfDay: Record<string, number> = {};
+        for (const d of scheduleDays) {
+          const [eh, em] = d.endTime.split(":").map(Number);
+          const [year, month, day] = d.date.split("-").map(Number);
+          endOfDay[d.date] = new Date(year, month - 1, day, eh, em).getTime();
+        }
+
+        // Find all pending matches on the same court ordered by scheduledAt
+        const courtMatches = await tx.match.findMany({
+          where: {
+            tournamentId: tournament.id,
+            court: match.court,
+            status: "pending",
+            scheduledAt: { not: null, gt: match.scheduledAt },
+          },
+          orderBy: { scheduledAt: "asc" },
+        });
+
+        for (const cm of courtMatches) {
+          const newTs = new Date(cm.scheduledAt!.getTime() + delayMs);
+          const dateKey = newTs.toISOString().slice(0, 10);
+          const dayEnd = endOfDay[dateKey];
+
+          if (dayEnd && newTs.getTime() + slotMs > dayEnd) {
+            // Hard stop: remove schedule, mark overflow
+            await tx.match.update({
+              where: { id: cm.id },
+              data: { scheduledAt: null, court: null },
+            });
+          } else {
+            await tx.match.update({
+              where: { id: cm.id },
+              data: { scheduledAt: newTs },
+            });
+          }
+        }
+      }
+    }
+
     // 2. Propagate winner to next knockout match
     if (match.nextMatchId) {
       const slot = match.nextMatchSlot === 2 ? "team2Id" : "team1Id";
@@ -239,4 +293,42 @@ export async function PUT(
   broadcastUpdate(tournament.id, "match_updated", { matchId, slug });
 
   return NextResponse.json(result);
+}
+
+// PATCH: mark a match as in_progress (started)
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ slug: string; matchId: string }> }
+) {
+  const { slug, matchId } = await params;
+  const token = extractAdminToken(req, slug);
+
+  const tournament = await prisma.tournament.findUnique({ where: { slug } });
+  if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
+  if (tournament.adminToken !== token) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
+
+  const match = await prisma.match.findUnique({ where: { id: matchId } });
+  if (!match || match.tournamentId !== tournament.id) {
+    return NextResponse.json({ error: "Jogo não encontrado" }, { status: 404 });
+  }
+  if (match.status !== "pending") {
+    return NextResponse.json({ error: "Apenas jogos pendentes podem ser iniciados" }, { status: 409 });
+  }
+  if (!match.team1Id || !match.team2Id) {
+    return NextResponse.json({ error: "As duas duplas ainda não estão definidas" }, { status: 400 });
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const providedAt = body.startedAt ? new Date(body.startedAt) : null;
+  const startedAt = providedAt && !isNaN(providedAt.getTime()) ? providedAt : new Date();
+
+  const updated = await prisma.match.update({
+    where: { id: matchId },
+    data: { status: "in_progress", startedAt },
+    include: { team1: true, team2: true },
+  });
+
+  broadcastUpdate(tournament.id, "match_updated", { matchId, slug });
+
+  return NextResponse.json({ match: updated });
 }

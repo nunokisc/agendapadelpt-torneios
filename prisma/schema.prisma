@@ -23,6 +23,8 @@ model Tournament {
   isPublic         Boolean @default(false)
   registrationOpen Boolean @default(false)
   courtCount       Int?
+  slotMinutes      Int?    // minutes per match slot (set by auto-schedule)
+  scheduleDays     String? // JSON: [{date,startTime,endTime}[]] (set by auto-schedule)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -95,6 +97,7 @@ model Match {
   scores        String?
   scheduledAt   DateTime?
   court         String?
+  startedAt     DateTime?
 
   status        String  @default("pending")
 

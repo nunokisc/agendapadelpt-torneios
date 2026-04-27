@@ -103,10 +103,27 @@ export async function POST(
     return NextResponse.json({ error: "Nenhuma janela horária tem capacidade para pelo menos um jogo" }, { status: 400 });
   }
 
-  // Flatten matches sorted by round then position (preserves bracket order)
-  const allMatches = [...tournament.matches].sort(
-    (a, b) => a.round - b.round || a.position - b.position
-  );
+  // Phase ordering: group stage must come entirely before knockout phases.
+  // Round numbers restart at 1 per bracketType, so we sort by phase first.
+  const PHASE_ORDER: Record<string, number> = {
+    group: 0,
+    winners: 1,
+    losers: 2,
+    third_place: 3,
+    final: 4,
+  };
+
+  // Flatten matches: phase → round → groupIndex → position
+  const allMatches = [...tournament.matches].sort((a, b) => {
+    const pa = PHASE_ORDER[a.bracketType] ?? 99;
+    const pb = PHASE_ORDER[b.bracketType] ?? 99;
+    if (pa !== pb) return pa - pb;
+    if (a.round !== b.round) return a.round - b.round;
+    const ga = a.groupIndex ?? 0;
+    const gb = b.groupIndex ?? 0;
+    if (ga !== gb) return ga - gb;
+    return a.position - b.position;
+  });
 
   const updates: { id: string; court: string; scheduledAt: Date }[] = [];
 
@@ -136,14 +153,22 @@ export async function POST(
     updates.push({ id: m.id, court: `Campo ${courtNum}`, scheduledAt });
   });
 
-  await prisma.$transaction(
-    updates.map((u) =>
+  await prisma.$transaction([
+    // Persist schedule config on tournament for delay-push use
+    prisma.tournament.update({
+      where: { id: tournament.id },
+      data: {
+        slotMinutes: minutesPerMatch,
+        scheduleDays: JSON.stringify(days),
+      },
+    }),
+    ...updates.map((u) =>
       prisma.match.update({
         where: { id: u.id },
         data: { court: u.court, scheduledAt: u.scheduledAt },
       })
-    )
-  );
+    ),
+  ]);
 
   return NextResponse.json({ updated: updates.length });
 }
