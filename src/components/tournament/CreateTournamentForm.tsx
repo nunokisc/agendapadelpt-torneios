@@ -7,7 +7,6 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import type { TournamentFormat, MatchFormat } from "@/types";
-import { FORMAT_LABELS } from "@/lib/scoring";
 import { saveTournament } from "@/lib/my-tournaments";
 
 const FORMAT_OPTIONS = [
@@ -17,17 +16,33 @@ const FORMAT_OPTIONS = [
   { value: "groups_knockout", label: "Fase de Grupos + Eliminação" },
 ];
 
-const MATCH_FORMAT_OPTIONS: { value: MatchFormat; label: string }[] = [
-  { value: "A1", label: "A1 — 3 sets a 6 jogos (vantagem)" },
-  { value: "A2", label: "A2 — 3 sets a 6 jogos (No-Ad)" },
-  { value: "B1", label: "B1 — 2 sets a 6 jogos + Super Tie-Break a 10" },
-  { value: "B2", label: "B2 — 2 sets a 6 jogos (No-Ad) + Super Tie-Break a 10" },
-  { value: "C1", label: "C1 — 2 sets a 4 jogos + Super Tie-Break a 10" },
-  { value: "C2", label: "C2 — 2 sets a 4 jogos (No-Ad) + Super Tie-Break a 10" },
-  { value: "D1", label: "D1 — 1 set a 9 jogos" },
-  { value: "D2", label: "D2 — 1 set a 9 jogos (No-Ad)" },
-  { value: "E", label: "E — Super Tie-Break a 10 (ultra-rápido)" },
-  { value: "F", label: "F — 1 set a 4 jogos (No-Ad)" },
+const MATCH_FORMAT_GROUPS: { label: string; options: { value: MatchFormat; label: string }[] }[] = [
+  {
+    label: "FPP (Federação Portuguesa de Padel)",
+    options: [
+      { value: "M3SPO", label: "M3SPO — 2 sets a 6 jogos No-Ad + Super Tie-Break" },
+      { value: "M3S",   label: "M3S — 2 sets a 6 jogos + Super Tie-Break" },
+      { value: "M3PO",  label: "M3PO — 3 sets a 6 jogos No-Ad" },
+      { value: "M3",    label: "M3 — 3 sets a 6 jogos, vantagem" },
+      { value: "PROPO", label: "PROPO — 1 set a 9 jogos No-Ad" },
+      { value: "PRO",   label: "PRO — 1 set a 9 jogos" },
+    ],
+  },
+  {
+    label: "FFT (Fédération Française de Tennis)",
+    options: [
+      { value: "B1", label: "B1 — 2 sets a 6 jogos + Super Tie-Break a 10" },
+      { value: "B2", label: "B2 — 2 sets a 6 jogos (No-Ad) + Super Tie-Break a 10" },
+      { value: "A1", label: "A1 — 3 sets a 6 jogos (vantagem)" },
+      { value: "A2", label: "A2 — 3 sets a 6 jogos (No-Ad)" },
+      { value: "C1", label: "C1 — 2 sets a 4 jogos + Super Tie-Break a 10" },
+      { value: "C2", label: "C2 — 2 sets a 4 jogos (No-Ad) + Super Tie-Break a 10" },
+      { value: "D1", label: "D1 — 1 set a 9 jogos" },
+      { value: "D2", label: "D2 — 1 set a 9 jogos (No-Ad)" },
+      { value: "E",  label: "E — Super Tie-Break a 10 (ultra-rápido)" },
+      { value: "F",  label: "F — 1 set a 4 jogos (No-Ad)" },
+    ],
+  },
 ];
 
 const GROUP_COUNT_OPTIONS = Array.from({ length: 7 }, (_, i) => ({
@@ -50,7 +65,8 @@ export default function CreateTournamentForm() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [format, setFormat] = useState<TournamentFormat>("single_elimination");
-  const [matchFormat, setMatchFormat] = useState<MatchFormat>("B1");
+  const [matchFormat, setMatchFormat] = useState<MatchFormat>("M3SPO");
+  const [starPoint, setStarPoint] = useState(false);
   const [thirdPlace, setThirdPlace] = useState(false);
   const [groupCount, setGroupCount] = useState(2);
   const [advanceCount, setAdvanceCount] = useState(2);
@@ -74,6 +90,7 @@ export default function CreateTournamentForm() {
         description: description.trim() || undefined,
         format,
         matchFormat,
+        starPoint,
         thirdPlace: isSingle ? thirdPlace : false,
         courtCount: courtCount !== "" ? Number(courtCount) : 1,
       };
@@ -147,16 +164,37 @@ export default function CreateTournamentForm() {
         />
 
         <div className="flex flex-col gap-1">
-          <Select
-            label="Formato do jogo"
-            options={MATCH_FORMAT_OPTIONS}
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Formato do jogo
+          </label>
+          <select
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
             value={matchFormat}
             onChange={(e) => setMatchFormat(e.target.value as MatchFormat)}
-          />
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {FORMAT_LABELS[matchFormat]}
-          </p>
+          >
+            {MATCH_FORMAT_GROUPS.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.options.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
         </div>
+
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+            checked={starPoint}
+            onChange={(e) => setStarPoint(e.target.checked)}
+          />
+          <span className="text-sm text-slate-700 dark:text-slate-300">
+            Star Point (FIP 2026) — ponto de ouro a 40-40
+          </span>
+        </label>
 
         {isSingle && (
           <label className="flex items-center gap-3 cursor-pointer">

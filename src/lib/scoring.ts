@@ -1,4 +1,6 @@
-export type MatchFormat = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2' | 'D1' | 'D2' | 'E' | 'F';
+export type MatchFormat =
+  | 'PRO' | 'PROPO' | 'M3S' | 'M3SPO' | 'M3' | 'M3PO'
+  | 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2' | 'D1' | 'D2' | 'E' | 'F';
 
 export interface SetScore {
   team1: number;
@@ -18,6 +20,14 @@ export interface SetStructure {
 }
 
 export const FORMAT_LABELS: Record<MatchFormat, string> = {
+  // FPP formats
+  PRO:   'PRO — 1 set a 9 jogos (FPP/D1)',
+  PROPO: 'PROPO — 1 set a 9 jogos No-Ad (FPP/D2)',
+  M3S:   'M3S — 2 sets a 6 jogos + Super Tie-Break (FPP/B1)',
+  M3SPO: 'M3SPO — 2 sets a 6 jogos No-Ad + Super Tie-Break (FPP/B2)',
+  M3:    'M3 — 3 sets a 6 jogos, vantagem (FPP/A1)',
+  M3PO:  'M3PO — 3 sets a 6 jogos No-Ad (FPP/A2)',
+  // FFT formats
   A1: '3 sets a 6 jogos (vantagem)',
   A2: '3 sets a 6 jogos (No-Ad)',
   B1: '2 sets a 6 jogos + Super Tie-Break a 10',
@@ -32,6 +42,14 @@ export const FORMAT_LABELS: Record<MatchFormat, string> = {
 
 export function getFormatStructure(format: MatchFormat): SetStructure[] {
   switch (format) {
+    // FPP aliases
+    case 'PRO':   return getFormatStructure('D1');
+    case 'PROPO': return getFormatStructure('D2');
+    case 'M3S':   return getFormatStructure('B1');
+    case 'M3SPO': return getFormatStructure('B2');
+    case 'M3':    return getFormatStructure('A1');
+    case 'M3PO':  return getFormatStructure('A2');
+
     case 'A1':
       return [
         { type: 'normal', maxGames: 6, tiebreakAt: 6, tiebreakTarget: 7 },
@@ -173,13 +191,7 @@ export function determineMatchWinner(scores: SetScore[], format: MatchFormat): 1
     const set = scores[i];
     const struct = structure[Math.min(i, structure.length - 1)];
 
-    // For B/C formats: if we're at the 3rd set entry, treat as super tiebreak
-    const effectiveStruct: SetStructure =
-      (format === 'B1' || format === 'B2' || format === 'C1' || format === 'C2') && i === 2
-        ? { type: 'superTiebreak', superTiebreakTarget: 10 }
-        : struct;
-
-    const winner = determineSetWinner(set, effectiveStruct);
+    const winner = determineSetWinner(set, struct);
     if (winner === 1) t1Sets++;
     else if (winner === 2) t2Sets++;
   }
@@ -212,30 +224,22 @@ export function validateScores(scores: SetScore[], format: MatchFormat): { valid
     const set = scores[i];
     const struct = structure[Math.min(i, structure.length - 1)];
 
-    // For B/C formats: the 3rd slot is always a super tiebreak
-    const isSTBSlot =
-      (format === 'B1' || format === 'B2' || format === 'C1' || format === 'C2') && i === 2;
-
-    const effectiveStruct: SetStructure = isSTBSlot
-      ? { type: 'superTiebreak', superTiebreakTarget: 10 }
-      : struct;
-
     // Validate the set
-    const setValidation = validateSingleSet(set, effectiveStruct, i + 1);
+    const setValidation = validateSingleSet(set, struct, i + 1);
     if (!setValidation.valid) return setValidation;
 
     // Check we haven't already found a winner before this set
     if (t1Sets >= 2 || t2Sets >= 2) {
       return { valid: false, error: `Set ${i + 1} é desnecessário — o vencedor já foi determinado` };
     }
-    // For A formats (best of 3): check if someone already won
-    if ((format === 'A1' || format === 'A2') && i >= 2) {
+    // For 3-set formats (best of 3): check if someone already won
+    if ((format === 'A1' || format === 'A2' || format === 'M3' || format === 'M3PO') && i >= 2) {
       if (t1Sets >= 1 && t2Sets === 0) {
         return { valid: false, error: `Set ${i + 1} é desnecessário — o vencedor já foi determinado` };
       }
     }
 
-    const winner = determineSetWinner(set, effectiveStruct);
+    const winner = determineSetWinner(set, struct);
     if (winner === 1) t1Sets++;
     else if (winner === 2) t2Sets++;
   }

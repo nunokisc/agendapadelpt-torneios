@@ -15,7 +15,11 @@ export type BracketType =
   | "group"
   | "third_place";
 
-export type MatchFormat = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2' | 'D1' | 'D2' | 'E' | 'F';
+// FFT formats
+// FPP formats (PRO=D1, PROPO=D2, M3S=B1, M3SPO=B2, M3=A1, M3PO=A2)
+export type MatchFormat =
+  | 'PRO' | 'PROPO' | 'M3S' | 'M3SPO' | 'M3' | 'M3PO'
+  | 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2' | 'D1' | 'D2' | 'E' | 'F';
 
 export interface SetScore {
   team1: number;
@@ -33,6 +37,7 @@ export interface Tournament {
   format: TournamentFormat;
   status: TournamentStatus;
   matchFormat: string;
+  starPoint: boolean;
   thirdPlace: boolean;
   groupCount: number | null;
   advanceCount: number | null;
@@ -97,6 +102,7 @@ export interface CreateTournamentInput {
   description?: string;
   format: TournamentFormat;
   matchFormat?: string;
+  starPoint?: boolean;
   thirdPlace?: boolean;
   groupCount?: number;
   advanceCount?: number;

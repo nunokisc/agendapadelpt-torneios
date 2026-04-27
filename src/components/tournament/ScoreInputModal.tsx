@@ -77,7 +77,7 @@ function Stepper({
 // ── Main modal ────────────────────────────────────────────────────────────────
 
 export default function ScoreInputModal({ match, slug, token, matchFormat, onClose, onSaved }: Props) {
-  const format = (matchFormat || "B1") as MatchFormat;
+  const format = (matchFormat || "M3SPO") as MatchFormat;
   const structure = getFormatStructure(format);
   const { toast } = useToast();
 
@@ -107,12 +107,7 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
 
   const setWinners = sets.map((set, i) => {
     const struct = structure[Math.min(i, structure.length - 1)];
-    const isSTBSlot =
-      (format === "B1" || format === "B2" || format === "C1" || format === "C2") && i === 2;
-    const effectiveStruct = isSTBSlot
-      ? { type: "superTiebreak" as const, superTiebreakTarget: 10 }
-      : struct;
-    return determineSetWinner(set, effectiveStruct);
+    return determineSetWinner(set, struct);
   });
 
   const t1Sets = setWinners.filter((w) => w === 1).length;
@@ -123,9 +118,6 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
   function needsTiebreak(set: SetScore, idx: number): boolean {
     const struct = structure[Math.min(idx, structure.length - 1)];
     if (struct.type === "superTiebreak") return false;
-    const isSTBSlot =
-      (format === "B1" || format === "B2" || format === "C1" || format === "C2") && idx === 2;
-    if (isSTBSlot) return false;
     if (struct.tiebreakAt === undefined) return false;
     return set.team1 === struct.tiebreakAt && set.team2 === struct.tiebreakAt;
   }
@@ -160,10 +152,7 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
     return t1Sets === 1 && t2Sets === 1 && sets.length < 3;
   })();
 
-  const isSTBDecider =
-    structure[2] &&
-    (structure[2].type === "superTiebreak" ||
-      format === "B1" || format === "B2" || format === "C1" || format === "C2");
+  const isSTBDecider = structure[2]?.type === "superTiebreak";
 
   function addDecider() {
     setSets((prev) => [
@@ -224,9 +213,7 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
         <div className="space-y-4">
           {sets.map((s, idx) => {
             const struct = structure[Math.min(idx, structure.length - 1)];
-            const isSTBSlot =
-              (format === "B1" || format === "B2" || format === "C1" || format === "C2") && idx === 2;
-            const isSuperTB = struct.type === "superTiebreak" || isSTBSlot;
+            const isSuperTB = struct.type === "superTiebreak";
             const setWinner = setWinners[idx];
             const showTiebreak = needsTiebreak(s, idx);
             const maxScore = isSuperTB ? 99 : (struct.maxGames ?? 6) + 2;

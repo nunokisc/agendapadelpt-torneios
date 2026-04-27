@@ -15,6 +15,7 @@ interface Props {
 
 interface Standing {
   player: Player;
+  played: number;
   wins: number;
   losses: number;
   setsFor: number;
@@ -40,12 +41,20 @@ export default function RoundRobinTable({ matches, players, isAdmin, onMatchClic
       .map((s) => {
         const player = groupPlayers.find((p) => p.id === s.playerId);
         if (!player) return null;
-        return { player, wins: s.wins, losses: s.losses, setsFor: s.setsFor, setsAgainst: s.setsAgainst, gamesFor: s.gamesFor, gamesAgainst: s.gamesAgainst };
+        return {
+          player,
+          played: s.played,
+          wins: s.wins,
+          losses: s.losses,
+          setsFor: s.setsFor,
+          setsAgainst: s.setsAgainst,
+          gamesFor: s.gamesFor,
+          gamesAgainst: s.gamesAgainst,
+        };
       })
       .filter((s): s is Standing => s !== null);
   }, [groupMatches, groupPlayers]);
 
-  // Rounds of matches
   const maxRound = Math.max(...groupMatches.map((m) => m.round), 0);
   const rounds = Array.from({ length: maxRound }, (_, i) =>
     groupMatches.filter((m) => m.round === i + 1)
@@ -60,12 +69,15 @@ export default function RoundRobinTable({ matches, players, isAdmin, onMatchClic
             <tr className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
               <th className="text-left py-2 pr-4 pl-2">#</th>
               <th className="text-left py-2 pr-4">Dupla</th>
-              <th className="py-2 px-2 text-center">V</th>
-              <th className="py-2 px-2 text-center">D</th>
-              <th className="py-2 px-2 text-center">S+</th>
-              <th className="py-2 px-2 text-center">S-</th>
-              <th className="py-2 px-2 text-center hidden sm:table-cell">J+</th>
-              <th className="py-2 px-2 text-center hidden sm:table-cell">J-</th>
+              <th className="py-2 px-2 text-center" title="Jogos disputados">J</th>
+              <th className="py-2 px-2 text-center" title="Vitórias">V</th>
+              <th className="py-2 px-2 text-center" title="Derrotas">D</th>
+              <th className="py-2 px-2 text-center" title="Sets ganhos">SG</th>
+              <th className="py-2 px-2 text-center" title="Sets perdidos">SP</th>
+              <th className="py-2 px-2 text-center" title="Saldo de sets">SS</th>
+              <th className="py-2 px-2 text-center hidden sm:table-cell" title="Jogos ganhos">JG</th>
+              <th className="py-2 px-2 text-center hidden sm:table-cell" title="Jogos perdidos">JP</th>
+              <th className="py-2 px-2 text-center hidden sm:table-cell" title="Saldo de jogos">SJ</th>
             </tr>
           </thead>
           <tbody>
@@ -78,12 +90,19 @@ export default function RoundRobinTable({ matches, players, isAdmin, onMatchClic
                 <td className="py-2 pr-4 font-medium text-slate-800 dark:text-slate-200">
                   {s.player.name}
                 </td>
+                <td className="py-2 px-2 text-center text-slate-500 dark:text-slate-400">{s.played}</td>
                 <td className="py-2 px-2 text-center text-emerald-600 dark:text-emerald-400 font-bold">{s.wins}</td>
                 <td className="py-2 px-2 text-center text-red-500">{s.losses}</td>
                 <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{s.setsFor}</td>
                 <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{s.setsAgainst}</td>
+                <td className="py-2 px-2 text-center font-medium text-slate-700 dark:text-slate-300">
+                  {s.setsFor - s.setsAgainst > 0 ? `+${s.setsFor - s.setsAgainst}` : s.setsFor - s.setsAgainst}
+                </td>
                 <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400 hidden sm:table-cell">{s.gamesFor}</td>
                 <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400 hidden sm:table-cell">{s.gamesAgainst}</td>
+                <td className="py-2 px-2 text-center font-medium text-slate-700 dark:text-slate-300 hidden sm:table-cell">
+                  {s.gamesFor - s.gamesAgainst > 0 ? `+${s.gamesFor - s.gamesAgainst}` : s.gamesFor - s.gamesAgainst}
+                </td>
               </tr>
             ))}
           </tbody>

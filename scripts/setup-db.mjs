@@ -84,6 +84,7 @@ if (isMySQL) {
     { id: "setup-doubles",  name: "20260424_doubles" },
     { id: "setup-features", name: "20260424_features" },
     { id: "setup-checkin",  name: "20260425_checkin" },
+    { id: "setup-starpoint", name: "20260426_starpoint" },
   ];
 
   const db = new Database(dbPath);
@@ -115,7 +116,16 @@ if (isMySQL) {
       continue;
     }
     const sqlPath = resolve(root, `prisma/migrations-sqlite/${m.name}/migration.sql`);
-    db.exec(readFileSync(sqlPath, "utf8"));
+    try {
+      db.exec(readFileSync(sqlPath, "utf8"));
+    } catch (err) {
+      // Idempotent: ignore errors for columns/tables that already exist
+      const msg = err.message ?? "";
+      if (!msg.includes("duplicate column name") && !msg.includes("already exists")) {
+        throw err;
+      }
+      console.log(`  warn  ${m.name} (schema already present, recording as applied)`);
+    }
     insert.run(m.id, "manual-setup", m.name);
     console.log(`  apply ${m.name}`);
   }
