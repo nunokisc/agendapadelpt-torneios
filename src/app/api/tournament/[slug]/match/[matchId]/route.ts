@@ -45,6 +45,20 @@ export async function PUT(
     }
   }
 
+  // GUARD: re-editing a group match is blocked if ANY knockout match already has a result
+  if (match.status === "completed" && match.bracketType === "group") {
+    const catFilter = match.categoryId ? { categoryId: match.categoryId } : { tournamentId: tournament.id };
+    const completedKnockout = await prisma.match.count({
+      where: { ...catFilter, bracketType: { not: "group" }, status: "completed" },
+    });
+    if (completedKnockout > 0) {
+      return NextResponse.json(
+        { error: "Não é possível editar: já existem resultados no knockout" },
+        { status: 400 }
+      );
+    }
+  }
+
   const body = await req.json();
   const parsed = scoreSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
@@ -164,7 +178,11 @@ export async function PUT(
           where: { ...categoryFilter, bracketType: { not: "group" } },
         });
 
-        if (knockoutCount === 0) {
+        // Always regenerate; delete existing knockout first if re-editing a group result
+        if (knockoutCount > 0) {
+          await tx.match.deleteMany({ where: { ...categoryFilter, bracketType: { not: "group" } } });
+        }
+        {
           // Determine group config from category or tournament
           let groupCount = tournament.groupCount ?? 2;
           let advanceCount = tournament.advanceCount ?? 2;
@@ -331,4 +349,100 @@ export async function PATCH(
   broadcastUpdate(tournament.id, "match_updated", { matchId, slug });
 
   return NextResponse.json({ match: updated });
+}
+
+// DELETE: reset a completed match back to pending (clears scores, winner, startedAt)
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ slug: string; matchId: string }> }
+) {
+  const { slug, matchId } = await params;
+  const token = extractAdminToken(req, slug);
+
+  const tournament = await prisma.tournament.findUnique({ where: { slug } });
+  if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
+  if (tournament.adminToken !== token) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
+
+  const match = await prisma.match.findUnique({ where: { id: matchId } });
+  if (!match || match.tournamentId !== tournament.id) {
+    return NextResponse.json({ error: "Jogo não encontrado" }, { status: 404 });
+  }
+  if (match.status !== "completed") {
+    return NextResponse.json({ error: "Apenas jogos com resultado podem ser reposto" }, { status: 400 });
+  }
+
+  // Guard: downstream match must not be completed
+  if (match.nextMatchId) {
+    const nextMatch = await prisma.match.findUnique({ where: { id: match.nextMatchId } });
+    if (nextMatch?.status === "completed") {
+      return NextResponse.json(
+        { error: "Não é possível repor: o jogo seguinte já tem resultado" },
+        { status: 409 }
+      );
+    }
+  }
+  if (match.loserNextMatchId) {
+    const loserNext = await prisma.match.findUnique({ where: { id: match.loserNextMatchId } });
+    if (loserNext?.status === "completed") {
+      return NextResponse.json(
+        { error: "Não é possível repor: o jogo do bracket losers seguinte já tem resultado" },
+        { status: 409 }
+      );
+    }
+  }
+
+  // For group match: block if any knockout match is already completed
+  const catFilter = match.categoryId ? { categoryId: match.categoryId } : { tournamentId: tournament.id };
+  const isGroupMatch = match.bracketType === "group";
+  if (isGroupMatch) {
+    const completedKnockout = await prisma.match.count({
+      where: { ...catFilter, bracketType: { not: "group" }, status: "completed" },
+    });
+    if (completedKnockout > 0) {
+      return NextResponse.json(
+        { error: "Não é possível repor: já existem resultados no knockout" },
+        { status: 409 }
+      );
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Reset match to pending
+    await tx.match.update({
+      where: { id: matchId },
+      data: { status: "pending", scores: null, winnerId: null, startedAt: null },
+    });
+
+    // Clear the winner slot from the next knockout match
+    if (match.nextMatchId) {
+      const slot = match.nextMatchSlot === 2 ? "team2Id" : "team1Id";
+      await tx.match.update({ where: { id: match.nextMatchId }, data: { [slot]: null } });
+    }
+
+    // Clear the loser slot from the losers-bracket match
+    if (match.loserNextMatchId) {
+      const slot = match.loserNextSlot === 2 ? "team2Id" : "team1Id";
+      await tx.match.update({ where: { id: match.loserNextMatchId }, data: { [slot]: null } });
+    }
+
+    // For group match: delete entire knockout bracket so it regenerates once all group matches are done again
+    if (isGroupMatch) {
+      await tx.match.deleteMany({ where: { ...catFilter, bracketType: { not: "group" } } });
+    }
+
+    // Reopen category/tournament if they were marked completed
+    if (match.categoryId) {
+      const cat = await tx.category.findUnique({ where: { id: match.categoryId }, select: { status: true } });
+      if (cat?.status === "completed") {
+        await tx.category.update({ where: { id: match.categoryId }, data: { status: "active" } });
+      }
+    }
+    const tourn = await tx.tournament.findUnique({ where: { id: tournament.id }, select: { status: true } });
+    if (tourn?.status === "completed") {
+      await tx.tournament.update({ where: { id: tournament.id }, data: { status: "active" } });
+    }
+  });
+
+  broadcastUpdate(tournament.id, "match_updated", { matchId, slug });
+  return NextResponse.json({ success: true });
 }

@@ -83,6 +83,8 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
 
   const [sets, setSets] = useState<SetScore[]>(() => buildInitialSets(format));
   const [loading, setLoading] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -183,6 +185,26 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
       setError(err instanceof Error ? err.message : "Erro desconhecido");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleReset() {
+    if (!match) return;
+    setResetting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/tournament/${slug}/match/${match.id}?token=${token}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Erro ao repor resultado");
+      toast("Resultado reposto com sucesso");
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido");
+      setConfirmReset(false);
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -314,11 +336,26 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
         )}
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-        <div className="flex justify-end gap-3 pt-1">
-          <Button variant="secondary" onClick={onClose} disabled={loading}>Cancelar</Button>
-          <Button onClick={handleSave} loading={loading} disabled={!matchWinner || !validation.valid}>
-            Guardar
-          </Button>
+        <div className="flex flex-wrap items-start gap-3 pt-1">
+          {match.status === "completed" && (
+            confirmReset ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-red-600 dark:text-red-400 font-medium">Repor resultado?</span>
+                <Button variant="secondary" onClick={() => setConfirmReset(false)} disabled={resetting}>Não</Button>
+                <Button variant="danger" onClick={handleReset} loading={resetting}>Sim, repor</Button>
+              </div>
+            ) : (
+              <Button variant="danger" onClick={() => setConfirmReset(true)} disabled={loading || resetting}>
+                Repor resultado
+              </Button>
+            )
+          )}
+          <div className="flex gap-3 ml-auto">
+            <Button variant="secondary" onClick={onClose} disabled={loading || resetting}>Cancelar</Button>
+            <Button onClick={handleSave} loading={loading} disabled={!matchWinner || !validation.valid || resetting}>
+              Guardar
+            </Button>
+          </div>
         </div>
       </div>
     </Modal>
