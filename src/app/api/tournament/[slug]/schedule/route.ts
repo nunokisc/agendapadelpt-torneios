@@ -125,32 +125,65 @@ export async function POST(
     return a.position - b.position;
   });
 
+  // ── Per-court pointer initialisation ──────────────────────────────────────
+  // Find the latest occupied end time on each court among already-completed /
+  // in-progress matches so that newly-scheduled slots start AFTER them.
+  const existingScheduled = await prisma.match.findMany({
+    where: {
+      tournamentId: tournament.id,
+      scheduledAt: { not: null },
+      status: { in: ["completed", "in_progress"] },
+    },
+    select: { court: true, scheduledAt: true },
+  });
+
+  const courtLastEndMs: Record<string, number> = {};
+  for (const em of existingScheduled) {
+    if (!em.court || !em.scheduledAt) continue;
+    const endMs = em.scheduledAt.getTime() + msPerMatch;
+    if (!courtLastEndMs[em.court] || endMs > courtLastEndMs[em.court]) {
+      courtLastEndMs[em.court] = endMs;
+    }
+  }
+
+  // Default start = day 0 start; push forward per court if existing matches exist
+  const [y0, m0, d0] = daySlots[0].date.split("-").map(Number);
+  const day0StartMs = new Date(y0, m0 - 1, d0, daySlots[0].startHour, daySlots[0].startMin).getTime();
+
+  const courtNextFreeMs: Record<string, number> = {};
+  for (let c = 1; c <= courts; c++) {
+    const name = `Campo ${c}`;
+    courtNextFreeMs[name] = Math.max(day0StartMs, courtLastEndMs[name] ?? 0);
+  }
+
+  // Returns the first slot-boundary time within daySlots that is >= notBeforeMs,
+  // or null if all day windows are exhausted.
+  function nextSlotAfter(notBeforeMs: number): Date | null {
+    for (const d of daySlots) {
+      const [year, month, day] = d.date.split("-").map(Number);
+      const dayStartMs = new Date(year, month - 1, day, d.startHour, d.startMin).getTime();
+      const dayEndMs = dayStartMs + d.slots * msPerMatch;
+
+      if (notBeforeMs >= dayEndMs) continue; // this entire day is already past
+
+      // Round up to the next whole slot boundary within this day
+      const slotOffset = Math.max(0, Math.ceil((notBeforeMs - dayStartMs) / msPerMatch));
+      if (slotOffset < d.slots) {
+        return new Date(dayStartMs + slotOffset * msPerMatch);
+      }
+    }
+    return null; // all windows exhausted
+  }
+
   const updates: { id: string; court: string; scheduledAt: Date }[] = [];
 
   allMatches.forEach((m, i) => {
-    const globalSlot = Math.floor(i / courts);
-    const courtNum = (i % courts) + 1;
+    const courtName = `Campo ${(i % courts) + 1}`;
+    const scheduledAt = nextSlotAfter(courtNextFreeMs[courtName]);
+    if (!scheduledAt) return; // overflows all day windows — skip
 
-    // Map globalSlot to (dayIndex, slotWithinDay)
-    let remaining = globalSlot;
-    let targetDay: (typeof daySlots)[number] | null = null;
-    let slotWithinDay = 0;
-    for (const d of daySlots) {
-      if (remaining < d.slots) {
-        targetDay = d;
-        slotWithinDay = remaining;
-        break;
-      }
-      remaining -= d.slots;
-    }
-
-    if (!targetDay) return; // overflows all day windows — skip
-
-    const [year, month, day] = targetDay.date.split("-").map(Number);
-    const startMs = new Date(year, month - 1, day, targetDay.startHour, targetDay.startMin).getTime();
-    const scheduledAt = new Date(startMs + slotWithinDay * msPerMatch);
-
-    updates.push({ id: m.id, court: `Campo ${courtNum}`, scheduledAt });
+    courtNextFreeMs[courtName] = scheduledAt.getTime() + msPerMatch;
+    updates.push({ id: m.id, court: courtName, scheduledAt });
   });
 
   await prisma.$transaction([
