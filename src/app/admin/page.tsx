@@ -120,13 +120,13 @@ function AdminPage() {
               placeholder="Token de administração"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0E7C66]"
               autoFocus
             />
             {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
             <button
               type="submit"
-              className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 text-sm transition-colors"
+              className="w-full rounded-lg bg-[#0E7C66] hover:bg-[#0a6354] text-white font-semibold py-2.5 text-sm transition-colors"
             >
               Entrar
             </button>
@@ -178,8 +178,8 @@ function AdminPage() {
             { label: "Total", value: total, color: "text-slate-700 dark:text-slate-200" },
             { label: "Rascunho", value: byStatus.draft, color: "text-slate-500" },
             { label: "Em curso", value: byStatus.in_progress, color: "text-blue-600 dark:text-blue-400" },
-            { label: "Concluídos", value: byStatus.completed, color: "text-emerald-600 dark:text-emerald-400" },
-            { label: "Jogos feitos", value: platformStats?.completedMatches ?? "-", color: "text-emerald-600 dark:text-emerald-400" },
+            { label: "Concluídos", value: byStatus.completed, color: "text-[#0E7C66] dark:text-[#A3E635]" },
+            { label: "Jogos feitos", value: platformStats?.completedMatches ?? "-", color: "text-[#0E7C66] dark:text-[#A3E635]" },
             { label: "Jogos pendentes", value: platformStats?.pendingMatches ?? "-", color: "text-amber-600 dark:text-amber-400" },
           ].map((s) => (
             <div
@@ -228,13 +228,13 @@ function AdminPage() {
               placeholder="Pesquisar por nome ou slug..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full max-w-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full max-w-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7C66]"
             />
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <div className="animate-spin h-6 w-6 border-4 border-emerald-500 border-t-transparent rounded-full" />
+              <div className="animate-spin h-6 w-6 border-4 border-[#0E7C66] border-t-transparent rounded-full" />
             </div>
           ) : filtered.length === 0 ? (
             <p className="text-center text-sm text-slate-400 py-12">
@@ -299,7 +299,7 @@ function AdminPage() {
                           <Link
                             href={`/tournament/${t.slug}?token=${t.adminToken}`}
                             target="_blank"
-                            className="text-xs px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-colors whitespace-nowrap"
+                            className="text-xs px-2 py-1 rounded bg-[#0E7C66] hover:bg-[#0a6354] text-white font-medium transition-colors whitespace-nowrap"
                           >
                             Admin
                           </Link>

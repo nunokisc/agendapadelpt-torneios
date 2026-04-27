@@ -58,8 +58,8 @@ export default function TorneiosPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-12">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Torneios</h1>
-        <p className="mt-2 text-slate-500 dark:text-slate-400 text-sm">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">Torneios</h1>
+        <p className="mt-2 text-gray-500 dark:text-slate-400 text-sm">
           Torneios públicos disponíveis na plataforma.
         </p>
       </div>
@@ -70,7 +70,7 @@ export default function TorneiosPage() {
           placeholder="Pesquisar torneios..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="w-full max-w-sm rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7C66]"
         />
       </div>
 
@@ -86,7 +86,7 @@ export default function TorneiosPage() {
           <p className="text-slate-500">
             {search ? "Nenhum torneio encontrado." : "Ainda não há torneios públicos."}
           </p>
-          <Link href="/" className="mt-4 inline-block text-sm text-emerald-600 hover:underline">
+          <Link href="/" className="mt-4 inline-block text-sm text-[#0E7C66] hover:underline">
             Criar um torneio →
           </Link>
         </div>
@@ -96,24 +96,24 @@ export default function TorneiosPage() {
             <Link
               key={t.id}
               href={`/tournament/${t.slug}`}
-              className="group rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md transition-all"
+              className="group rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 hover:border-[#0E7C66]/40 dark:hover:border-[#0E7C66]/40 hover:shadow-md transition-all"
             >
               <div className="flex items-start justify-between gap-3 mb-3">
-                <h2 className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors leading-tight">
+                <h2 className="font-semibold text-gray-800 dark:text-slate-200 group-hover:text-[#0E7C66] dark:group-hover:text-[#A3E635] transition-colors leading-tight">
                   {t.name}
                 </h2>
                 <Badge variant={STATUS_VARIANT[t.status]}>{STATUS_LABEL[t.status]}</Badge>
               </div>
               {t.description && (
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 line-clamp-2">{t.description}</p>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mb-3 line-clamp-2">{t.description}</p>
               )}
-              <div className="flex items-center justify-between text-xs text-slate-400">
+              <div className="flex items-center justify-between text-xs text-gray-400">
                 <span>{FORMAT_LABELS[t.format] ?? t.format} · {t.matchFormat}</span>
                 <span>{t._count.players} dupla{t._count.players !== 1 ? "s" : ""}</span>
               </div>
               {t.registrationOpen && (
                 <div className="mt-2">
-                  <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 font-medium">
+                  <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-[#d1fae5] dark:bg-[#0E7C66]/20 text-[#0E7C66] dark:text-[#A3E635] font-medium">
                     Inscrições abertas
                   </span>
                 </div>

@@ -57,7 +57,7 @@ function Stepper({
       </button>
       <span
         className={`w-10 text-center text-2xl font-bold font-mono tabular-nums select-none ${
-          winner ? "text-emerald-600 dark:text-emerald-400" : "text-slate-800 dark:text-slate-100"
+          winner ? "text-[#0E7C66] dark:text-[#A3E635]" : "text-slate-800 dark:text-slate-100"
         }`}
       >
         {value}
@@ -248,7 +248,7 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</span>
                   <div className="flex items-center gap-2">
                     {setWinner && (
-                      <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                      <span className="text-xs text-[#0E7C66] dark:text-[#A3E635] font-medium">
                         {setWinner === 1 ? team1Name : team2Name} vence
                       </span>
                     )}
@@ -311,7 +311,7 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
           <button
             type="button"
             onClick={addDecider}
-            className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 transition-colors"
+            className="text-sm text-[#0E7C66] hover:text-[#0E7C66] dark:text-[#A3E635] flex items-center gap-1.5 transition-colors"
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -322,8 +322,8 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
 
         {/* Winner banner */}
         {winnerName && (
-          <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 px-4 py-2.5 text-center">
-            <p className="text-sm text-emerald-700 dark:text-emerald-400">
+          <div className="rounded-lg bg-[#d1fae5]/40 dark:bg-[#0E7C66]/10 border border-[#0E7C66]/30 dark:border-[#0E7C66]/30 px-4 py-2.5 text-center">
+            <p className="text-sm text-[#0E7C66] dark:text-[#A3E635]">
               Vencedor: <strong>{winnerName}</strong>{" "}
               <span className="font-mono text-xs">({t1Sets}–{t2Sets})</span>
             </p>

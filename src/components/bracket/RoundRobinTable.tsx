@@ -92,7 +92,7 @@ export default function RoundRobinTable({ matches, players, isAdmin, onMatchClic
                   {s.player.name}
                 </td>
                 <td className="py-2 px-2 text-center text-slate-500 dark:text-slate-400">{s.played}</td>
-                <td className="py-2 px-2 text-center text-emerald-600 dark:text-emerald-400 font-bold">{s.wins}</td>
+                <td className="py-2 px-2 text-center text-[#0E7C66] dark:text-[#A3E635] font-bold">{s.wins}</td>
                 <td className="py-2 px-2 text-center text-red-500">{s.losses}</td>
                 <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{s.setsFor}</td>
                 <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{s.setsAgainst}</td>

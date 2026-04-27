@@ -36,7 +36,7 @@ function MatchRow({ match, myId, allMatches }: { match: Match; myId: string; all
 
   const statusColor =
     match.status === "completed"
-      ? won ? "border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/20"
+      ? won ? "border-[#0E7C66]/40 dark:border-[#0E7C66]/30 bg-[#d1fae5]/40 dark:bg-[#0E7C66]/10"
              : "border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/10"
       : match.status === "in_progress"
       ? "border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20"
@@ -48,7 +48,7 @@ function MatchRow({ match, myId, allMatches }: { match: Match; myId: string; all
         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{roundLabel}</span>
         {match.status === "completed" && (
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-            won ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400"
+            won ? "bg-[#d1fae5] dark:bg-[#0E7C66]/20 text-[#0E7C66] dark:text-[#A3E635]"
                 : "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
           }`}>
             {won ? "Vitória" : "Derrota"}
@@ -121,7 +121,7 @@ export default function MinhaDuplaPage() {
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="animate-spin h-6 w-6 border-4 border-emerald-500 border-t-transparent rounded-full" />
+      <div className="animate-spin h-6 w-6 border-4 border-[#0E7C66] border-t-transparent rounded-full" />
     </div>
   );
 
@@ -178,7 +178,7 @@ export default function MinhaDuplaPage() {
           onChange={(e) => handleSearch(e.target.value)}
           placeholder="Nome do jogador ou dupla…"
           autoFocus
-          className="w-full pl-9 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-base"
+          className="w-full pl-9 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0E7C66] text-base"
         />
         {search && (
           <button

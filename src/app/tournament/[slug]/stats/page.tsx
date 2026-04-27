@@ -73,7 +73,7 @@ export default function StatsPage() {
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="animate-spin h-6 w-6 border-4 border-emerald-500 border-t-transparent rounded-full" />
+      <div className="animate-spin h-6 w-6 border-4 border-[#0E7C66] border-t-transparent rounded-full" />
     </div>
   );
 
@@ -142,7 +142,7 @@ export default function StatsPage() {
                       )}
                     </td>
                     <td className="py-2.5 px-2 text-center text-slate-600 dark:text-slate-400 font-mono">{s.played}</td>
-                    <td className="py-2.5 px-2 text-center text-emerald-600 dark:text-emerald-400 font-bold">{s.wins}</td>
+                    <td className="py-2.5 px-2 text-center text-[#0E7C66] dark:text-[#A3E635] font-bold">{s.wins}</td>
                     <td className="py-2.5 px-2 text-center text-red-500 font-mono">{s.losses}</td>
                     <td className="py-2.5 px-2 text-center hidden sm:table-cell text-slate-600 dark:text-slate-400">{s.winPct}%</td>
                     <td className="py-2.5 px-2 text-center hidden sm:table-cell text-slate-600 dark:text-slate-400">{s.setsFor}</td>

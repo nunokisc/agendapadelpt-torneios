@@ -2,41 +2,81 @@
 
 import { useState, useEffect } from "react";
 
+// Synced from agendapadelpt — uses same localStorage key and theme mechanism
+type Theme = "light" | "dark" | "system";
+
+const STORAGE_KEY = "agendapadel-theme";
+
+function getSystemTheme(): "light" | "dark" {
+  if (typeof window === "undefined") return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function applyTheme(theme: Theme) {
+  const resolved = theme === "system" ? getSystemTheme() : theme;
+  const isDark = resolved === "dark";
+  // Set data-theme attribute (CSS variable overrides)
+  document.documentElement.setAttribute("data-theme", resolved);
+  // Set dark class (Tailwind dark: utilities)
+  document.documentElement.classList.toggle("dark", isDark);
+}
+
 export default function ThemeToggle() {
-  const [dark, setDark] = useState(false);
+  const [theme, setTheme] = useState<Theme>("light");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const isDark = saved ? saved === "dark" : prefersDark;
-    setDark(isDark);
-    document.documentElement.classList.toggle("dark", isDark);
+    const saved = (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? "system";
+    setTheme(saved);
+    applyTheme(saved);
+    setMounted(true);
+
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = () => {
+      const current = (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? "system";
+      if (current === "system") applyTheme("system");
+    };
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
   }, []);
 
-  function toggle() {
-    const next = !dark;
-    setDark(next);
-    localStorage.setItem("theme", next ? "dark" : "light");
-    document.documentElement.classList.toggle("dark", next);
-  }
+  const handleChange = (next: Theme) => {
+    setTheme(next);
+    localStorage.setItem(STORAGE_KEY, next);
+    applyTheme(next);
+  };
+
+  if (!mounted) return null;
+
+  const options: { value: Theme; label: string; icon: string }[] = [
+    { value: "light", label: "Claro", icon: "☀️" },
+    { value: "dark", label: "Escuro", icon: "🌙" },
+    { value: "system", label: "Sistema", icon: "💻" },
+  ];
 
   return (
-    <button
-      onClick={toggle}
-      title={dark ? "Tema claro" : "Tema escuro"}
-      className="rounded-lg p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-      aria-label={dark ? "Mudar para tema claro" : "Mudar para tema escuro"}
+    <div
+      className="flex items-center gap-1 bg-gray-100 dark:bg-slate-800 rounded-xl p-1"
+      role="radiogroup"
+      aria-label="Tema do site"
     >
-      {dark ? (
-        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="4" />
-          <path strokeLinecap="round" d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-        </svg>
-      ) : (
-        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" />
-        </svg>
-      )}
-    </button>
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => handleChange(opt.value)}
+          role="radio"
+          aria-checked={theme === opt.value}
+          aria-label={`Tema: ${opt.label}`}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            theme === opt.value
+              ? "bg-[#A3E635] text-[#111827] shadow-sm"
+              : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-700"
+          }`}
+        >
+          <span>{opt.icon}</span>
+          <span className="hidden sm:inline">{opt.label}</span>
+        </button>
+      ))}
+    </div>
   );
 }

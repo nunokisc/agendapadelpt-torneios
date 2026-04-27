@@ -18,14 +18,15 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       "inline-flex items-center justify-center font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
 
     const variants = {
+      // Synced from agendapadelpt brand color
       primary:
-        "bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:ring-emerald-500",
+        "bg-[#0E7C66] text-white hover:bg-[#0a6354] focus-visible:ring-[#0E7C66]",
       secondary:
-        "bg-slate-100 text-slate-900 hover:bg-slate-200 focus-visible:ring-slate-400 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600",
+        "bg-gray-100 text-gray-900 hover:bg-gray-200 focus-visible:ring-gray-400 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600",
       danger:
         "bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500",
       ghost:
-        "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800",
+        "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-800",
     };
 
     const sizes = {

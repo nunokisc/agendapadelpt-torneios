@@ -64,12 +64,12 @@ export default function MatchCard({ match, isAdmin, onClick, onStart, highlight,
   const canStart = canEdit && match.status === "pending" && !!onStart;
 
   const statusBg = isBye
-    ? "border-dashed border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50"
+    ? "border-dashed border-gray-200 bg-gray-50 dark:border-slate-700 dark:bg-slate-900/50"
     : isCompleted
-    ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/20"
+    ? "border-[#0E7C66]/30 bg-[#d1fae5]/40 dark:border-[#0E7C66]/30 dark:bg-[#0E7C66]/10"
     : isInProgress
     ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/20"
-    : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900";
+    : "border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900";
 
   function PlayerRow({
     name,
@@ -90,8 +90,8 @@ export default function MatchCard({ match, isAdmin, onClick, onStart, highlight,
         <span
           className={cn(
             compact ? "truncate flex-1 min-w-0" : "truncate max-w-[170px]",
-            isWinner ? "font-bold text-emerald-700 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300",
-            !name && "text-slate-300 dark:text-slate-600 italic"
+            isWinner ? "font-bold text-[#0E7C66] dark:text-[#A3E635]" : "text-gray-700 dark:text-slate-300",
+            !name && "text-gray-300 dark:text-slate-600 italic"
           )}
         >
           {name ?? (isBye ? "—" : "A determinar")}
@@ -100,7 +100,7 @@ export default function MatchCard({ match, isAdmin, onClick, onStart, highlight,
           <span
             className={cn(
               "font-mono text-xs font-bold ml-2 shrink-0",
-              isWinner ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"
+              isWinner ? "text-[#0E7C66] dark:text-[#A3E635]" : "text-gray-400"
             )}
           >
             {sets}
@@ -128,19 +128,19 @@ export default function MatchCard({ match, isAdmin, onClick, onStart, highlight,
         compact ? "w-full" : "w-[260px]",
         "rounded-lg border-2 overflow-hidden transition-all select-none",
         highlight ? "border-yellow-400 shadow-yellow-200 shadow-md dark:border-yellow-500 dark:shadow-yellow-900/50" : statusBg,
-        (canEdit && !isInProgress) && "cursor-pointer hover:border-emerald-400 hover:shadow-md active:scale-95"
+        (canEdit && !isInProgress) && "cursor-pointer hover:border-[#0E7C66]/50 hover:shadow-md active:scale-95"
       )}
       style={{ minHeight: 72 }}
       onClick={(canEdit && !isInProgress) ? onClick : undefined}
       title={canEdit && !isInProgress ? (isRescore ? "Clica para editar resultado" : "Clica para introduzir resultado") : undefined}
     >
       {isBye ? (
-        <div className="flex items-center justify-center h-full py-4 text-xs text-slate-400 italic">
+        <div className="flex items-center justify-center h-full py-4 text-xs text-gray-400 italic">
           bye
         </div>
       ) : (
         <>
-          <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
+          <div className="divide-y divide-gray-100 dark:divide-slate-700/50">
             <PlayerRow
               name={match.team1?.name}
               sets={team1Sets}
@@ -175,8 +175,8 @@ export default function MatchCard({ match, isAdmin, onClick, onStart, highlight,
 
           {/* Schedule row (hidden when in-progress — replaced by timer bar) */}
           {!isInProgress && hasSchedule && (
-            <div className="px-3 py-1 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/60 dark:bg-slate-800/40 flex items-center justify-between gap-2">
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+            <div className="px-3 py-1 border-t border-gray-100 dark:border-slate-700/50 bg-gray-50/60 dark:bg-slate-800/40 flex items-center justify-between gap-2">
+              <p className="text-[10px] text-gray-500 dark:text-slate-400 truncate">
                 {scheduleLabel}
               </p>
               {/* Iniciar button — only for admin on pending matches with both teams */}
@@ -192,13 +192,13 @@ export default function MatchCard({ match, isAdmin, onClick, onStart, highlight,
                     <button
                       type="button"
                       onClick={() => { onStart!(match.id, startTime); setShowStart(false); }}
-                      className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 transition-colors"
+                      className="text-[10px] font-bold text-[#0E7C66] dark:text-[#A3E635] hover:text-[#0a6354] transition-colors"
                       title="Confirmar início"
                     >✓</button>
                     <button
                       type="button"
                       onClick={() => setShowStart(false)}
-                      className="text-[10px] font-semibold text-slate-400 hover:text-slate-600 transition-colors"
+                      className="text-[10px] font-semibold text-gray-400 hover:text-gray-600 transition-colors"
                       title="Cancelar"
                     >✕</button>
                   </div>
@@ -206,7 +206,7 @@ export default function MatchCard({ match, isAdmin, onClick, onStart, highlight,
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setStartTime(nowHHMM()); setShowStart(true); }}
-                    className="shrink-0 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 transition-colors active:scale-95 touch-manipulation"
+                    className="shrink-0 text-[10px] font-semibold text-[#0E7C66] dark:text-[#A3E635] hover:text-[#0a6354] dark:hover:text-white transition-colors active:scale-95 touch-manipulation"
                     title="Marcar jogo como iniciado"
                   >
                     ▶ Iniciar
@@ -218,25 +218,25 @@ export default function MatchCard({ match, isAdmin, onClick, onStart, highlight,
 
           {/* Iniciar button when no schedule row — only admin + pending + both teams */}
           {!isInProgress && !hasSchedule && canStart && (
-            <div className="px-3 py-1 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/60 dark:bg-slate-800/40 flex justify-end">
+            <div className="px-3 py-1 border-t border-gray-100 dark:border-slate-700/50 bg-gray-50/60 dark:bg-slate-800/40 flex justify-end">
               {showStart ? (
                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="time"
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
-                    className="text-[10px] border border-slate-300 dark:border-slate-600 rounded px-1 py-px bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 w-[4.5rem]"
+                    className="text-[10px] border border-gray-300 dark:border-slate-600 rounded px-1 py-px bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 w-[4.5rem]"
                   />
                   <button
                     type="button"
                     onClick={() => { onStart!(match.id, startTime); setShowStart(false); }}
-                    className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 transition-colors"
+                    className="text-[10px] font-bold text-[#0E7C66] dark:text-[#A3E635] hover:text-[#0a6354] transition-colors"
                     title="Confirmar início"
                   >✓</button>
                   <button
                     type="button"
                     onClick={() => setShowStart(false)}
-                    className="text-[10px] font-semibold text-slate-400 hover:text-slate-600 transition-colors"
+                    className="text-[10px] font-semibold text-gray-400 hover:text-gray-600 transition-colors"
                     title="Cancelar"
                   >✕</button>
                 </div>
@@ -244,7 +244,7 @@ export default function MatchCard({ match, isAdmin, onClick, onStart, highlight,
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setStartTime(nowHHMM()); setShowStart(true); }}
-                  className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 transition-colors active:scale-95 touch-manipulation"
+                  className="text-[10px] font-semibold text-[#0E7C66] dark:text-[#A3E635] hover:text-[#0a6354] dark:hover:text-white transition-colors active:scale-95 touch-manipulation"
                   title="Marcar jogo como iniciado"
                 >
                   ▶ Iniciar

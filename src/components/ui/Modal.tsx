@@ -35,18 +35,18 @@ export default function Modal({ open, onClose, title, children, className }: Mod
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div
         className={cn(
-          "relative z-10 w-full max-w-lg max-h-[90vh] flex flex-col rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900",
+          "relative z-10 w-full max-w-lg max-h-[90vh] flex flex-col rounded-xl border border-gray-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900",
           className
         )}
       >
         {title && (
-          <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-700">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
               {title}
             </h2>
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

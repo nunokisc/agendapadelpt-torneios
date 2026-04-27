@@ -130,7 +130,7 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
           <CardTitle>Agenda de jogos</CardTitle>
           <button
             onClick={() => setShowAuto((v) => !v)}
-            className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 transition-colors"
+            className="text-xs text-[#0E7C66] hover:text-[#0E7C66] dark:text-[#A3E635] transition-colors"
           >
             Agendar automaticamente
           </button>
@@ -155,7 +155,7 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
                     type="date"
                     value={day.date}
                     onChange={(e) => updateDay(i, "date", e.target.value)}
-                    className="w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    className="w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#0E7C66]"
                   />
                 </div>
                 <div>
@@ -164,7 +164,7 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
                     type="time"
                     value={day.startTime}
                     onChange={(e) => updateDay(i, "startTime", e.target.value)}
-                    className="w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    className="w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#0E7C66]"
                   />
                 </div>
                 <div>
@@ -173,7 +173,7 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
                     type="time"
                     value={day.endTime}
                     onChange={(e) => updateDay(i, "endTime", e.target.value)}
-                    className="w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    className="w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#0E7C66]"
                   />
                 </div>
                 <div className={i === 0 ? "pt-4" : ""}>
@@ -193,7 +193,7 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
 
           <button
             onClick={addDay}
-            className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline"
+            className="text-xs text-[#0E7C66] dark:text-[#A3E635] hover:underline"
           >
             + Adicionar dia
           </button>
@@ -206,7 +206,7 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
               max={240}
               value={minutesPerMatch}
               onChange={(e) => setMinutesPerMatch(Number(e.target.value))}
-              className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#0E7C66]"
             />
           </div>
 
@@ -245,7 +245,7 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
                         value={courtVal}
                         onChange={(e) => setCourtVal(e.target.value)}
                         placeholder={`Campo 1`}
-                        className="mt-0.5 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        className="mt-0.5 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#0E7C66]"
                       />
                     </div>
                     <div>
@@ -254,7 +254,7 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
                         type="datetime-local"
                         value={timeVal}
                         onChange={(e) => setTimeVal(e.target.value)}
-                        className="mt-0.5 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        className="mt-0.5 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#0E7C66]"
                       />
                     </div>
                   </div>
@@ -271,7 +271,7 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
                       {team1} <span className="text-slate-400">vs</span> {team2}
                     </p>
                     {(m.court || m.scheduledAt) && (
-                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
+                      <p className="text-xs text-[#0E7C66] dark:text-[#A3E635] mt-0.5">
                         {m.court}{m.court && m.scheduledAt ? " · " : ""}{m.scheduledAt ? fmt(m.scheduledAt) : ""}
                       </p>
                     )}
@@ -290,7 +290,7 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
                         })()}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-emerald-500 hover:text-emerald-600 transition-colors"
+                        className="text-[#0E7C66] hover:text-[#0E7C66] transition-colors"
                         title="Partilhar jogo via WhatsApp"
                       >
                         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">

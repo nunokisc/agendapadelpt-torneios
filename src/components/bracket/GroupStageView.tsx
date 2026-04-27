@@ -55,7 +55,7 @@ export default function GroupStageView({ matches, players, isAdmin, onMatchClick
               onClick={() => setMobileTab(i)}
               className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
                 mobileTab === i
-                  ? "bg-emerald-600 text-white"
+                  ? "bg-[#0E7C66] text-white"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
               }`}
             >

@@ -125,7 +125,7 @@ export default function RegistrationPanel({ slug, token, categories, activeCateg
                   <div className="mt-1 flex items-center gap-1.5">
                     <span className="text-xs text-slate-400">Série:</span>
                     <select
-                      className="text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-0.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      className="text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-0.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-[#0E7C66]"
                       value={r.categoryId ?? ""}
                       onChange={(e) => changeCategory(r.id, e.target.value)}
                       disabled={actioning === r.id}

@@ -2,22 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== DESIGN TOKENS — Synced from agendapadelpt ===== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  /* Brand colors */
+  --color-padel-green: #0E7C66;
+  --color-padel-green-dark: #0a6354;
+  --color-padel-green-light: #d1fae5;
+  --color-lime: #A3E635;
+  --color-sport-dark: #111827;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Base */
+  --background: #F3F4F6;
+  --foreground: #111827;
+  --primary: #0E7C66;
+  --primary-dark: #0a6354;
+  --primary-light: #d1fae5;
+
+  /* Text */
+  --text-secondary: #6B7280;
+
+  /* Status */
+  --color-success: #22C55E;
+  --color-pending: #F59E0B;
+  --color-error: #EF4444;
+
+  /* Navbar logo */
+  --logo-agenda: #1F3D2B;
+  --logo-padel: #A3E635;
+  --logo-pt: #8A8A8A;
 }
 
 body {
-  color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--foreground);
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+*:focus-visible {
+  outline: 2px solid #0E7C66;
+  outline-offset: 2px;
 }
 
 @layer utilities {
@@ -27,4 +54,17 @@ body {
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+}
+
+/* ===== DARK THEME — Synced from agendapadelpt ===== */
+.dark,
+[data-theme="dark"] {
+  --background: #0f172a;
+  --foreground: #e2e8f0;
+  color-scheme: dark;
+
+  /* Navbar logo */
+  --logo-agenda: #ffffff;
+  --logo-padel: #A3E635;
+  --logo-pt: #B0B0B0;
 }

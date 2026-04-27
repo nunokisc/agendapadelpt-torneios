@@ -39,7 +39,7 @@ export default function ToastProvider({ children }: { children: React.ReactNode 
             className={cn(
               "px-4 py-3 rounded-lg shadow-lg text-sm font-medium pointer-events-auto",
               "translate-y-0 opacity-100",
-              t.type === "success" && "bg-emerald-600 text-white",
+              t.type === "success" && "bg-[#0E7C66] text-white",
               t.type === "error" && "bg-red-600 text-white",
               t.type === "info" && "bg-slate-700 text-white"
             )}

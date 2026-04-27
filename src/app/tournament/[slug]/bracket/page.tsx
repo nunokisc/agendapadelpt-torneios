@@ -59,7 +59,7 @@ export default function FullscreenBracketPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-4 border-emerald-500 border-t-transparent rounded-full" />
+        <div className="animate-spin h-8 w-8 border-4 border-[#0E7C66] border-t-transparent rounded-full" />
       </div>
     );
   }
@@ -158,7 +158,7 @@ export default function FullscreenBracketPage() {
               onClick={() => setActiveCat(cat.code)}
               className={`flex-shrink-0 px-3 py-1.5 text-sm font-medium rounded-t-lg transition-colors border-b-2 -mb-px ${
                 activeCategory?.id === cat.id
-                  ? "border-emerald-500 text-emerald-400"
+                  ? "border-[#0E7C66] text-[#A3E635]"
                   : "border-transparent text-slate-400 hover:text-slate-200"
               }`}
             >

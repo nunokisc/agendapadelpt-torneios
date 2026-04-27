@@ -129,7 +129,7 @@ function ManageCategoriesModal({
         </div>
         <form onSubmit={handleAdd} className="flex gap-2">
           <input
-            className="flex-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase placeholder:normal-case"
+            className="flex-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0E7C66] uppercase placeholder:normal-case"
             placeholder="Código (ex: M4, F3)"
             value={code}
             onChange={(e) => setCode(e.target.value)}
@@ -382,16 +382,16 @@ export default function TournamentPage() {
       {/* Public quick links */}
       {!isAdmin && !isDraft && (
         <div className="hidden sm:flex items-center gap-4 mb-4 text-sm">
-          <Link href={`/tournament/${slug}/stats`} className="text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1">
+          <Link href={`/tournament/${slug}/stats`} className="text-slate-500 hover:text-[#0E7C66] dark:hover:text-[#A3E635] transition-colors flex items-center gap-1">
             <IconStats /> Estatísticas
           </Link>
-          <Link href={`/tournament/${slug}/minha-dupla`} className="text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1">
+          <Link href={`/tournament/${slug}/minha-dupla`} className="text-slate-500 hover:text-[#0E7C66] dark:hover:text-[#A3E635] transition-colors flex items-center gap-1">
             <IconPerson /> Os meus jogos
           </Link>
           {pushNotifs.supported && (
             <button
               onClick={() => pushNotifs.subscribed ? pushNotifs.unsubscribe() : pushNotifs.subscribe()}
-              className={`flex items-center gap-1 transition-colors ${pushNotifs.subscribed ? "text-emerald-600 dark:text-emerald-400" : "text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400"}`}
+              className={`flex items-center gap-1 transition-colors ${pushNotifs.subscribed ? "text-[#0E7C66] dark:text-[#A3E635]" : "text-slate-500 hover:text-[#0E7C66] dark:hover:text-[#A3E635]"}`}
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill={pushNotifs.subscribed ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
                 <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" />
@@ -403,7 +403,7 @@ export default function TournamentPage() {
       )}
       {!isAdmin && isDraft && tournament.registrationOpen && (
         <div className="flex items-center gap-4 mb-4 text-sm">
-          <Link href={`/tournament/${slug}/register`} className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1">
+          <Link href={`/tournament/${slug}/register`} className="text-[#0E7C66] dark:text-[#A3E635] hover:underline flex items-center gap-1">
             Inscrever dupla →
           </Link>
         </div>
@@ -419,7 +419,7 @@ export default function TournamentPage() {
                 onClick={() => setActiveCat(cat.code)}
                 className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-t-lg transition-colors border-b-2 -mb-px ${
                   activeCategory?.id === cat.id
-                    ? "border-emerald-600 text-emerald-600 dark:text-emerald-400 dark:border-emerald-400"
+                    ? "border-[#0E7C66] text-[#0E7C66] dark:text-[#A3E635] dark:border-[#0E7C66]"
                     : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                 }`}
               >
@@ -432,7 +432,7 @@ export default function TournamentPage() {
             {isAdmin && isDraft && (
               <button
                 onClick={() => setShowManageCategories(true)}
-                className="ml-auto flex-shrink-0 text-xs text-slate-400 hover:text-emerald-600 transition-colors px-2 py-1"
+                className="ml-auto flex-shrink-0 text-xs text-slate-400 hover:text-[#0E7C66] transition-colors px-2 py-1"
               >
                 + Gerir categorias
               </button>
@@ -493,7 +493,7 @@ export default function TournamentPage() {
                   {isAdmin ? "Adiciona as duplas e clica em Gerar Bracket." : "O administrador ainda não gerou o bracket."}
                 </p>
                 {tournament.registrationOpen && !isAdmin && (
-                  <Link href={`/tournament/${slug}/register`} className="mt-3 inline-block text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
+                  <Link href={`/tournament/${slug}/register`} className="mt-3 inline-block text-sm text-[#0E7C66] dark:text-[#A3E635] hover:underline">
                     Inscrever dupla →
                   </Link>
                 )}
@@ -505,8 +505,8 @@ export default function TournamentPage() {
         /* In-progress / completed — bracket view */
         <div className="space-y-6">
           {tournament.status === "completed" && (
-            <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 px-6 py-4 text-center">
-              <p className="text-emerald-700 dark:text-emerald-400 font-semibold text-lg">🏆 Torneio concluído!</p>
+            <div className="rounded-xl bg-[#d1fae5]/40 dark:bg-[#0E7C66]/10 border border-[#0E7C66]/30 dark:border-[#0E7C66]/30 px-6 py-4 text-center">
+              <p className="text-[#0E7C66] dark:text-[#A3E635] font-semibold text-lg">🏆 Torneio concluído!</p>
             </div>
           )}
 
@@ -518,7 +518,7 @@ export default function TournamentPage() {
                   onClick={() => setActiveTab(key)}
                   className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
                     activeTab === key
-                      ? "border-emerald-600 text-emerald-600 dark:text-emerald-400 dark:border-emerald-400"
+                      ? "border-[#0E7C66] text-[#0E7C66] dark:text-[#A3E635] dark:border-[#0E7C66]"
                       : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                   }`}
                 >
@@ -541,7 +541,7 @@ export default function TournamentPage() {
             <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
               <div className="xl:col-span-1 space-y-3 hidden xl:block">
                 <PlayerList players={activeCategoryPlayers} slug={slug} token={token} categoryId={activeCategory?.id ?? null} onUpdate={fetchData} disabled />
-                <Link href={`/tournament/${slug}/stats`} className="block text-center text-xs text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors py-2">
+                <Link href={`/tournament/${slug}/stats`} className="block text-center text-xs text-slate-400 hover:text-[#0E7C66] dark:hover:text-[#A3E635] transition-colors py-2">
                   Ver estatísticas →
                 </Link>
               </div>
@@ -586,7 +586,7 @@ export default function TournamentPage() {
             <p className="text-sm text-slate-600 dark:text-slate-400">
               Com <strong>{checkedInPlayers.length}</strong> duplas confirmadas o sistema será:
             </p>
-            <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-300">
+            <div className="rounded-lg bg-[#d1fae5]/40 dark:bg-[#0E7C66]/10 border border-[#0E7C66]/30 dark:border-[#0E7C66]/30 px-3 py-2 text-sm text-[#0a6354] dark:text-[#A3E635]">
               <p className="font-semibold">{fppConfirm.description}</p>
               <p className="text-xs mt-0.5 opacity-80">Formato: {fppConfirm.matchFormat}</p>
             </div>
@@ -625,7 +625,7 @@ export default function TournamentPage() {
                 <button
                   key={key}
                   onClick={() => setActiveTab(key)}
-                  className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${activeTab === key ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"}`}
+                  className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${activeTab === key ? "text-[#0E7C66] dark:text-[#A3E635]" : "text-slate-400 dark:text-slate-500"}`}
                 >
                   {icon}
                   {label}

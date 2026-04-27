@@ -48,7 +48,7 @@ export default function LinkShare({ slug, adminToken }: LinkShareProps) {
           <CardTitle>Partilhar</CardTitle>
           <button
             onClick={() => setShowQr((v) => !v)}
-            className="text-xs text-slate-400 hover:text-emerald-600 transition-colors flex items-center gap-1"
+            className="text-xs text-slate-400 hover:text-[#0E7C66] transition-colors flex items-center gap-1"
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -106,7 +106,7 @@ export default function LinkShare({ slug, adminToken }: LinkShareProps) {
               <p className="text-xs text-slate-400 mt-0.5">Aponta para a vista pública do torneio.</p>
               <button
                 onClick={downloadQr}
-                className="mt-2 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 flex items-center gap-1"
+                className="mt-2 text-xs text-[#0E7C66] hover:text-[#0E7C66] dark:text-[#A3E635] flex items-center gap-1"
               >
                 <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

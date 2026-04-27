@@ -58,7 +58,7 @@ export default function TournamentBottomNav({ slug }: Props) {
             href={href}
             className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
               active
-                ? "text-emerald-600 dark:text-emerald-400"
+                ? "text-[#0E7C66] dark:text-[#A3E635]"
                 : "text-slate-400 dark:text-slate-500"
             }`}
           >

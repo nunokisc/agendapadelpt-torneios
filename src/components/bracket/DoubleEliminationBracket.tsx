@@ -47,7 +47,7 @@ export default function DoubleEliminationBracket({ matches, isAdmin, onMatchClic
               onClick={() => setMobileSection(key)}
               className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
                 mobileSection === key
-                  ? "bg-emerald-600 text-white"
+                  ? "bg-[#0E7C66] text-white"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
               }`}
             >
@@ -73,7 +73,7 @@ export default function DoubleEliminationBracket({ matches, isAdmin, onMatchClic
         )}
         {mobileSection === "final" && finals.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Grand Final</p>
+            <p className="text-xs font-semibold text-[#0E7C66] uppercase tracking-wide">Grand Final</p>
             {finals.map((m) => (
               <MatchCard key={m.id} match={m} isAdmin={isAdmin} onClick={() => onMatchClick(m)} onStart={onMatchStart} />
             ))}
@@ -104,7 +104,7 @@ export default function DoubleEliminationBracket({ matches, isAdmin, onMatchClic
         )}
         {finals.length > 0 && (
           <div>
-            <h4 className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-3">Grand Final</h4>
+            <h4 className="text-xs font-semibold text-[#0E7C66] uppercase tracking-wide mb-3">Grand Final</h4>
             <div className="flex gap-4">
               {finals.map((m) => (
                 <MatchCard key={m.id} match={m} isAdmin={isAdmin} onClick={() => onMatchClick(m)} onStart={onMatchStart} />
