@@ -11,8 +11,8 @@ NGINX_CACHE_DIR="/var/cache/nginx/padel_torneios"
 echo "==> [1/5] Pull do repositório..."
 git -C "$APP_DIR" pull --ff-only
 
-echo "==> [2/5] Instalação de dependências..."
-npm --prefix "$APP_DIR" ci --omit=dev
+echo "==> [2/5] Instalação de dependências (inclui devDeps necessários para o build)..."
+npm --prefix "$APP_DIR" ci
 
 echo "==> [3/5] Build de produção..."
 npm --prefix "$APP_DIR" run build
