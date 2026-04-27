@@ -4,7 +4,7 @@
 # Requer: pm2, nginx, sudo (para o cache purge)
 set -euo pipefail
 
-APP_DIR="/var/www/html/padel_torneios"
+APP_DIR="/root/agendapadelpt-torneios"
 PM2_APP="padel_torneios"
 NGINX_CACHE_DIR="/var/cache/nginx/padel_torneios"
 
