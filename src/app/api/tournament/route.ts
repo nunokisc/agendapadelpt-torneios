@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateUniqueSlug } from "@/lib/slug";
 import { createTournamentSchema } from "@/lib/validators";
+import { FPP_CATEGORIES_BY_CODE } from "@/lib/categories";
 import { nanoid } from "nanoid";
 
 export async function POST(req: NextRequest) {
@@ -20,19 +21,43 @@ export async function POST(req: NextRequest) {
     const slug = await generateUniqueSlug(data.name);
     const adminToken = nanoid(24);
 
-    const tournament = await prisma.tournament.create({
-      data: {
-        slug,
-        adminToken,
-        name: data.name,
-        description: data.description ?? null,
-        format: data.format,
-        matchFormat: data.matchFormat ?? 'M3SPO',
-        starPoint: data.starPoint ?? false,
-        thirdPlace: data.thirdPlace ?? false,
-        groupCount: data.groupCount ?? null,
-        advanceCount: data.advanceCount ?? null,
-      },
+    const categoryCodes = data.categories ?? ["OPEN"];
+
+    const tournament = await prisma.$transaction(async (tx) => {
+      const t = await tx.tournament.create({
+        data: {
+          slug,
+          adminToken,
+          name: data.name,
+          description: data.description ?? null,
+          format: data.format,
+          tournamentMode: data.tournamentMode ?? "manual",
+          matchFormat: data.matchFormat ?? "M3SPO",
+          starPoint: data.starPoint ?? false,
+          thirdPlace: data.thirdPlace ?? false,
+          groupCount: data.groupCount ?? null,
+          advanceCount: data.advanceCount ?? null,
+        },
+      });
+
+      await Promise.all(
+        categoryCodes.map((code, idx) => {
+          const info = FPP_CATEGORIES_BY_CODE[code];
+          const name = info?.name ?? (code === "OPEN" ? "Open" : code);
+          return tx.category.create({
+            data: {
+              tournamentId: t.id,
+              code,
+              name,
+              matchFormat: data.tournamentMode === "fpp_auto" ? null : (data.matchFormat ?? "M3SPO"),
+              starPoint: data.starPoint ?? false,
+              order: idx,
+            },
+          });
+        })
+      );
+
+      return t;
     });
 
     const publicUrl = `/tournament/${slug}`;

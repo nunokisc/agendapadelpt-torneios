@@ -6,18 +6,18 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
-import type { TournamentFormat, MatchFormat } from "@/types";
+import type { TournamentFormat, TournamentMode } from "@/types";
 import { saveTournament } from "@/lib/my-tournaments";
+import { FPP_CATEGORIES } from "@/lib/categories";
 
-const FORMAT_OPTIONS = [
-  { value: "fpp_auto", label: "Regulamento FPP (automático por nº de duplas)" },
+const MANUAL_FORMAT_OPTIONS = [
   { value: "single_elimination", label: "Eliminação Simples" },
   { value: "double_elimination", label: "Eliminação Dupla" },
-  { value: "round_robin", label: "Todos contra Todos (Round Robin)" },
-  { value: "groups_knockout", label: "Fase de Grupos + Eliminação (manual)" },
+  { value: "round_robin",        label: "Todos contra Todos (Round Robin)" },
+  { value: "groups_knockout",    label: "Fase de Grupos + Eliminação" },
 ];
 
-const MATCH_FORMAT_GROUPS: { label: string; options: { value: MatchFormat; label: string }[] }[] = [
+const MATCH_FORMAT_GROUPS: { label: string; options: { value: string; label: string }[] }[] = [
   {
     label: "FPP (Federação Portuguesa de Padel)",
     options: [
@@ -58,29 +58,20 @@ const ADVANCE_OPTIONS = [
   { value: 4, label: "4 por grupo" },
 ];
 
-const FPP_BRACKETS = [
-  { range: "4–5 duplas",  system: "1 grupo (round-robin) + Final" },
-  { range: "6–8 duplas",  system: "2 grupos + Meias + Final" },
-  { range: "9–11 duplas", system: "3 grupos + Quartos + Meias + Final" },
-  { range: "12+ duplas",  system: "Quadro directo (eliminação simples)" },
-];
+const CATEGORY_GROUPS = FPP_CATEGORIES.reduce<Record<string, typeof FPP_CATEGORIES>>(
+  (acc, cat) => { (acc[cat.group] ??= []).push(cat); return acc; },
+  {}
+);
+const CATEGORY_GROUP_ORDER = Array.from(new Set(FPP_CATEGORIES.map((c) => c.group)));
 
 function FPPAutoInfo() {
   return (
-    <div className="mt-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2.5 text-xs text-emerald-800 dark:text-emerald-300">
-      <p className="font-semibold mb-1">Regulamento FPP — sistema automático</p>
-      <p className="mb-1.5 text-emerald-700 dark:text-emerald-400">
-        Cria o torneio e adiciona as duplas. Quando clicares em &ldquo;Gerar Bracket&rdquo;,
-        o sistema escolhe automaticamente conforme o número de duplas confirmadas:
+    <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2.5 text-xs text-emerald-800 dark:text-emerald-300">
+      <p className="font-semibold mb-1">Regulamento FPP — formato automático por série</p>
+      <p className="text-emerald-700 dark:text-emerald-400">
+        O formato de jogo e o sistema de cada série são determinados automaticamente quando gerares o
+        bracket, com base no número de duplas inscritas, seguindo o regulamento FPP (Anexo XIX).
       </p>
-      <ul className="space-y-0.5">
-        {FPP_BRACKETS.map((b) => (
-          <li key={b.range} className="flex gap-2">
-            <span className="w-20 shrink-0 font-mono">{b.range}</span>
-            <span className="text-emerald-700 dark:text-emerald-400">{b.system}</span>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
@@ -92,36 +83,58 @@ export default function CreateTournamentForm() {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [tournamentMode, setTournamentMode] = useState<TournamentMode>("manual");
   const [format, setFormat] = useState<TournamentFormat>("single_elimination");
-  const [matchFormat, setMatchFormat] = useState<MatchFormat>("M3SPO");
+  const [matchFormat, setMatchFormat] = useState("M3SPO");
   const [starPoint, setStarPoint] = useState(false);
   const [thirdPlace, setThirdPlace] = useState(false);
   const [groupCount, setGroupCount] = useState(2);
   const [advanceCount, setAdvanceCount] = useState(2);
   const [courtCount, setCourtCount] = useState<string>("");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(["OPEN"]);
 
-  const isGroups = format === "groups_knockout";
-  const isFPPAuto = format === "fpp_auto";
-  const isSingle = format === "single_elimination";
+  const isFPPAuto = tournamentMode === "fpp_auto";
+  const isGroups = !isFPPAuto && format === "groups_knockout";
+  const isSingle = !isFPPAuto && format === "single_elimination";
+
+  function toggleCategory(code: string) {
+    setSelectedCategories((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
+  }
+
+  function handleModeChange(mode: TournamentMode) {
+    setTournamentMode(mode);
+    if (mode === "fpp_auto") {
+      // Switch from OPEN to M3 when moving to FPP auto
+      setSelectedCategories((prev) => {
+        const fpp = prev.filter((c) => c !== "OPEN");
+        return fpp.length > 0 ? fpp : ["M3"];
+      });
+    } else {
+      setSelectedCategories(["OPEN"]);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!name.trim()) {
-      setError("O nome do torneio é obrigatório.");
-      return;
-    }
+    if (!name.trim()) { setError("O nome do torneio é obrigatório."); return; }
+    if (selectedCategories.length === 0) { setError("Selecciona pelo menos uma categoria."); return; }
 
     setLoading(true);
     try {
+      const effectiveFormat: TournamentFormat = isFPPAuto ? "fpp_auto" : format;
       const body: Record<string, unknown> = {
         name: name.trim(),
         description: description.trim() || undefined,
-        format,
+        format: effectiveFormat,
+        tournamentMode,
         matchFormat,
         starPoint,
         thirdPlace: (isSingle || isFPPAuto) ? thirdPlace : false,
         courtCount: courtCount !== "" ? Number(courtCount) : 1,
+        categories: selectedCategories,
       };
       if (isGroups) {
         body.groupCount = groupCount;
@@ -133,19 +146,12 @@ export default function CreateTournamentForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error ?? "Erro ao criar torneio");
       }
-
       const data = await res.json();
-      saveTournament({
-        slug: data.tournament.slug,
-        name: name.trim(),
-        adminToken: data.adminToken,
-        createdAt: new Date().toISOString(),
-      });
+      saveTournament({ slug: data.tournament.slug, name: name.trim(), adminToken: data.adminToken, createdAt: new Date().toISOString() });
       router.push(data.adminUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
@@ -158,9 +164,7 @@ export default function CreateTournamentForm() {
     <Card className="w-full max-w-xl">
       <CardHeader>
         <CardTitle>Criar novo torneio</CardTitle>
-        <p className="text-sm text-slate-500 mt-1">
-          Preenche os detalhes e adiciona as duplas a seguir.
-        </p>
+        <p className="text-sm text-slate-500 mt-1">Preenche os detalhes e adiciona as duplas a seguir.</p>
       </CardHeader>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
@@ -173,9 +177,7 @@ export default function CreateTournamentForm() {
         />
 
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Descrição (opcional)
-          </label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Descrição (opcional)</label>
           <textarea
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 resize-none"
             rows={2}
@@ -185,38 +187,63 @@ export default function CreateTournamentForm() {
           />
         </div>
 
-        <div className="flex flex-col gap-1">
-          <Select
-            label="Formato do torneio"
-            options={FORMAT_OPTIONS}
-            value={format}
-            onChange={(e) => setFormat(e.target.value as TournamentFormat)}
-          />
-          {isFPPAuto && (
-            <FPPAutoInfo />
-          )}
+        {/* Bloco A — Modo */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Modo do torneio</label>
+          <div className="grid grid-cols-2 gap-2">
+            {(["manual", "fpp_auto"] as TournamentMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => handleModeChange(mode)}
+                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors text-left ${
+                  tournamentMode === mode
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-600"
+                    : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
+                }`}
+              >
+                {mode === "manual" ? "Manual" : "FPP Automático"}
+                <p className="text-xs font-normal mt-0.5 opacity-70">
+                  {mode === "manual"
+                    ? "Formato definido pelo organizador"
+                    : "Determinado automaticamente pela FPP"}
+                </p>
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Formato do jogo
-          </label>
-          <select
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            value={matchFormat}
-            onChange={(e) => setMatchFormat(e.target.value as MatchFormat)}
-          >
-            {MATCH_FORMAT_GROUPS.map((group) => (
-              <optgroup key={group.label} label={group.label}>
-                {group.options.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </div>
+        {!isFPPAuto && (
+          <div className="flex flex-col gap-1">
+            <Select
+              label="Formato do torneio"
+              options={MANUAL_FORMAT_OPTIONS}
+              value={format}
+              onChange={(e) => setFormat(e.target.value as TournamentFormat)}
+            />
+          </div>
+        )}
+
+        {!isFPPAuto ? (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Formato do jogo</label>
+            <select
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              value={matchFormat}
+              onChange={(e) => setMatchFormat(e.target.value)}
+            >
+              {MATCH_FORMAT_GROUPS.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.options.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <FPPAutoInfo />
+        )}
 
         <label className="flex items-center gap-3 cursor-pointer">
           <input
@@ -225,9 +252,7 @@ export default function CreateTournamentForm() {
             checked={starPoint}
             onChange={(e) => setStarPoint(e.target.checked)}
           />
-          <span className="text-sm text-slate-700 dark:text-slate-300">
-            Star Point (FIP 2026) — ponto de ouro a 40-40
-          </span>
+          <span className="text-sm text-slate-700 dark:text-slate-300">Star Point (FIP 2026) — ponto de ouro a 40-40</span>
         </label>
 
         {(isSingle || isFPPAuto) && (
@@ -238,9 +263,7 @@ export default function CreateTournamentForm() {
               checked={thirdPlace}
               onChange={(e) => setThirdPlace(e.target.checked)}
             />
-            <span className="text-sm text-slate-700 dark:text-slate-300">
-              Jogo para 3.º/4.º lugar
-            </span>
+            <span className="text-sm text-slate-700 dark:text-slate-300">Jogo para 3.º/4.º lugar</span>
           </label>
         )}
 
@@ -260,6 +283,84 @@ export default function CreateTournamentForm() {
             />
           </div>
         )}
+
+        {/* Bloco B — Categorias */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Séries / Categorias</label>
+            <span className="text-xs text-slate-400">
+              {selectedCategories.length} seleccionada{selectedCategories.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+
+          {!isFPPAuto ? (
+            <div className="space-y-2">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  checked={selectedCategories.includes("OPEN")}
+                  onChange={() => toggleCategory("OPEN")}
+                />
+                <span className="text-sm text-slate-700 dark:text-slate-300">
+                  <strong>OPEN</strong> — categoria única (torneio simples)
+                </span>
+              </label>
+              <details className="text-sm">
+                <summary className="text-xs text-slate-400 cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 select-none">
+                  Adicionar séries FPP (M3, F3, MX3…)
+                </summary>
+                <div className="mt-2 space-y-3 pl-1">
+                  {CATEGORY_GROUP_ORDER.map((groupName) => (
+                    <div key={groupName}>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">{groupName}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {CATEGORY_GROUPS[groupName].map((cat) => (
+                          <button
+                            key={cat.code}
+                            type="button"
+                            onClick={() => toggleCategory(cat.code)}
+                            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                              selectedCategories.includes(cat.code)
+                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 ring-1 ring-emerald-400"
+                                : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                            }`}
+                          >
+                            {cat.code}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-3 max-h-56 overflow-y-auto">
+              {CATEGORY_GROUP_ORDER.map((groupName) => (
+                <div key={groupName}>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">{groupName}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {CATEGORY_GROUPS[groupName].map((cat) => (
+                      <button
+                        key={cat.code}
+                        type="button"
+                        onClick={() => toggleCategory(cat.code)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                          selectedCategories.includes(cat.code)
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 ring-1 ring-emerald-400"
+                            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                        }`}
+                      >
+                        {cat.code}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <Input
           label="Número de campos"

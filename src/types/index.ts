@@ -5,7 +5,10 @@ export type TournamentFormat =
   | "groups_knockout"
   | "fpp_auto";
 
+export type TournamentMode = "manual" | "fpp_auto";
+
 export type TournamentStatus = "draft" | "in_progress" | "completed";
+export type CategoryStatus = "draft" | "in_progress" | "completed";
 
 export type MatchStatus = "pending" | "in_progress" | "completed" | "bye";
 
@@ -29,6 +32,25 @@ export interface SetScore {
   superTiebreak?: boolean;
 }
 
+export interface Category {
+  id: string;
+  tournamentId: string;
+  code: string;
+  name: string;
+  matchFormat: string | null;
+  starPoint: boolean;
+  status: CategoryStatus;
+  order: number;
+  groupCount: number | null;
+  advanceCount: number | null;
+  format: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  players?: Player[];
+  matches?: Match[];
+  registrations?: Registration[];
+}
+
 export interface Tournament {
   id: string;
   slug: string;
@@ -37,6 +59,7 @@ export interface Tournament {
   description: string | null;
   format: TournamentFormat;
   status: TournamentStatus;
+  tournamentMode: TournamentMode;
   matchFormat: string;
   starPoint: boolean;
   thirdPlace: boolean;
@@ -47,6 +70,7 @@ export interface Tournament {
   registrationOpen: boolean;
   createdAt: Date;
   updatedAt: Date;
+  categories?: Category[];
   players?: Player[];
   matches?: Match[];
 }
@@ -54,6 +78,7 @@ export interface Tournament {
 export interface Registration {
   id: string;
   tournamentId: string;
+  categoryId: string | null;
   player1Name: string;
   player2Name: string;
   teamName: string | null;
@@ -70,12 +95,14 @@ export interface Player {
   seed: number | null;
   checkedIn: boolean;
   tournamentId: string;
+  categoryId: string | null;
   groupIndex: number | null;
 }
 
 export interface Match {
   id: string;
   tournamentId: string;
+  categoryId: string | null;
   round: number;
   position: number;
   bracketType: BracketType;
@@ -102,9 +129,11 @@ export interface CreateTournamentInput {
   name: string;
   description?: string;
   format: TournamentFormat;
+  tournamentMode?: TournamentMode;
   matchFormat?: string;
   starPoint?: boolean;
   thirdPlace?: boolean;
   groupCount?: number;
   advanceCount?: number;
+  categories?: string[];
 }

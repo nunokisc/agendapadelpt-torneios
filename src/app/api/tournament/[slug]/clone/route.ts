@@ -12,7 +12,10 @@ export async function POST(
 
   const tournament = await prisma.tournament.findUnique({
     where: { slug },
-    include: { players: { orderBy: { seed: "asc" } } },
+    include: {
+      categories: { orderBy: { order: "asc" } },
+      players: { orderBy: { seed: "asc" } },
+    },
   });
   if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
   if (tournament.adminToken !== token) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
@@ -30,8 +33,10 @@ export async function POST(
         name: newName,
         description: tournament.description,
         format: tournament.format,
+        tournamentMode: tournament.tournamentMode,
         matchFormat: tournament.matchFormat,
         thirdPlace: tournament.thirdPlace,
+        starPoint: tournament.starPoint,
         groupCount: tournament.groupCount,
         advanceCount: tournament.advanceCount,
         courtCount: tournament.courtCount,
@@ -39,11 +44,30 @@ export async function POST(
       },
     });
 
+    // Clone categories and build old→new id map
+    const categoryIdMap = new Map<string, string>();
+    for (const cat of tournament.categories) {
+      const newCat = await tx.category.create({
+        data: {
+          tournamentId: t.id,
+          code: cat.code,
+          name: cat.name,
+          matchFormat: cat.matchFormat,
+          starPoint: cat.starPoint,
+          order: cat.order,
+          status: "draft",
+        },
+      });
+      categoryIdMap.set(cat.id, newCat.id);
+    }
+
+    // Clone players, mapping to new category IDs
     await Promise.all(
       tournament.players.map((p) =>
         tx.player.create({
           data: {
             tournamentId: t.id,
+            categoryId: p.categoryId ? (categoryIdMap.get(p.categoryId) ?? null) : null,
             name: p.name,
             player1Name: p.player1Name,
             player2Name: p.player2Name,

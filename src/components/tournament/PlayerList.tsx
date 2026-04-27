@@ -122,6 +122,7 @@ interface PlayerListProps {
   players: Player[];
   slug: string;
   token: string;
+  categoryId: string | null;
   onUpdate: () => void;
   disabled?: boolean;
 }
@@ -130,6 +131,7 @@ export default function PlayerList({
   players,
   slug,
   token,
+  categoryId,
   onUpdate,
   disabled = false,
 }: PlayerListProps) {
@@ -188,11 +190,12 @@ export default function PlayerList({
     setError(null);
     setLoading(true);
     try {
-      const body: Record<string, string> = {
+      const body: Record<string, unknown> = {
         player1: player1.trim(),
         player2: player2.trim(),
       };
       if (teamName.trim()) body.teamName = teamName.trim();
+      if (categoryId) body.categoryId = categoryId;
 
       const res = await fetch(`/api/tournament/${slug}/players?token=${token}`, {
         method: "POST",
@@ -224,7 +227,7 @@ export default function PlayerList({
       const res = await fetch(`/api/tournament/${slug}/players?token=${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teams }),
+        body: JSON.stringify({ teams, ...(categoryId ? { categoryId } : {}) }),
       });
       if (!res.ok) {
         const d = await res.json();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import TournamentBottomNav from "@/components/layout/TournamentBottomNav";
 import TournamentHeader from "@/components/tournament/TournamentHeader";
@@ -18,55 +18,128 @@ import DoubleEliminationBracket from "@/components/bracket/DoubleEliminationBrac
 import RoundRobinTable from "@/components/bracket/RoundRobinTable";
 import GroupStageView from "@/components/bracket/GroupStageView";
 import Button from "@/components/ui/Button";
-import { getFPPConfig } from "@/lib/fpp-bracket";
 import { Card } from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
 import { useToast } from "@/components/ui/ToastProvider";
 import { BracketSkeleton } from "@/components/ui/Skeleton";
-import type { Tournament, Player, Match } from "@/types";
+import { getFppFormatForCategory } from "@/lib/fpp-format";
+import type { Tournament, Player, Match, Category } from "@/types";
 
 interface TournamentData {
-  tournament: Tournament & { players: Player[]; matches: Match[] };
+  tournament: Tournament & { players: Player[]; matches: Match[]; categories: (Category & { players: Player[]; matches: Match[] })[] };
 }
 
-// ── Bottom nav icons ──────────────────────────────────────────────────────────
+// ── Icons ──────────────────────────────────────────────────────────────────────
 
 function IconBracket() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="2" y="3" width="6" height="4" rx="1" /><rect x="16" y="3" width="6" height="4" rx="1" />
-      <rect x="9" y="10" width="6" height="4" rx="1" /><rect x="9" y="17" width="6" height="4" rx="1" />
-      <path strokeLinecap="round" d="M5 7v3.5a.5.5 0 00.5.5H9M19 7v3.5a.5.5 0 01-.5.5H15" />
-      <path strokeLinecap="round" d="M12 14v3" />
-    </svg>
-  );
+  return <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="6" height="4" rx="1" /><rect x="16" y="3" width="6" height="4" rx="1" /><rect x="9" y="10" width="6" height="4" rx="1" /><rect x="9" y="17" width="6" height="4" rx="1" /><path strokeLinecap="round" d="M5 7v3.5a.5.5 0 00.5.5H9M19 7v3.5a.5.5 0 01-.5.5H15" /><path strokeLinecap="round" d="M12 14v3" /></svg>;
 }
 function IconCalendar() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="3" y="4" width="18" height="18" rx="2" /><path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18" />
-    </svg>
-  );
+  return <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18" /></svg>;
 }
 function IconUsers() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path strokeLinecap="round" d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
-      <path strokeLinecap="round" d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
-    </svg>
-  );
+  return <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path strokeLinecap="round" d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" /></svg>;
 }
 function IconPerson() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="8" r="4" /><path strokeLinecap="round" d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-    </svg>
-  );
+  return <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4" /><path strokeLinecap="round" d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></svg>;
 }
 function IconStats() {
+  return <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>;
+}
+
+const STATUS_VARIANT: Record<string, "default" | "info" | "success"> = {
+  draft: "default", in_progress: "info", completed: "success",
+};
+const STATUS_LABEL: Record<string, string> = {
+  draft: "Rascunho", in_progress: "Em Curso", completed: "Concluído",
+};
+
+// ── Category management modal ──────────────────────────────────────────────────
+
+function ManageCategoriesModal({
+  slug, token, categories, onClose, onUpdate,
+}: {
+  slug: string; token: string;
+  categories: Category[];
+  onClose: () => void;
+  onUpdate: () => void;
+}) {
+  const { toast } = useToast();
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    if (!code.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/tournament/${slug}/categories?token=${token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codes: [code.trim().toUpperCase()] }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setCode("");
+      onUpdate();
+      toast("Categoria adicionada!");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Erro");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRemove(catId: string) {
+    try {
+      const res = await fetch(`/api/tournament/${slug}/categories/${catId}?token=${token}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json()).error);
+      onUpdate();
+      toast("Categoria removida.");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Erro");
+    }
+  }
+
   return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-    </svg>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-sm p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Gerir Categorias</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="space-y-1.5">
+          {categories.map((cat) => (
+            <div key={cat.id} className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-800 px-3 py-2">
+              <div>
+                <span className="text-sm font-medium text-slate-800 dark:text-slate-200">{cat.code}</span>
+                <span className="ml-2 text-xs text-slate-400">{cat.name}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant={STATUS_VARIANT[cat.status]}>{STATUS_LABEL[cat.status]}</Badge>
+                {cat.status === "draft" && categories.length > 1 && (
+                  <button onClick={() => handleRemove(cat.id)} className="text-slate-300 hover:text-red-500 transition-colors">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        <form onSubmit={handleAdd} className="flex gap-2">
+          <input
+            className="flex-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase placeholder:normal-case"
+            placeholder="Código (ex: M4, F3)"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+          <Button size="sm" type="submit" loading={loading} disabled={!code.trim()}>
+            Adicionar
+          </Button>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -75,21 +148,21 @@ function IconStats() {
 export default function TournamentPage() {
   const { slug } = useParams<{ slug: string }>();
   const searchParams = useSearchParams();
-  // Token can come from query param (first visit) or cookie (subsequent visits via middleware redirect)
+  const router = useRouter();
   const queryToken = searchParams.get("token") ?? "";
   const [token, setToken] = useState(queryToken);
-  
+
   useEffect(() => {
     if (!queryToken) {
       const cookieToken = getAdminToken(slug);
       if (cookieToken) setToken(cookieToken);
     }
   }, [slug, queryToken]);
-  
-  const isAdmin = Boolean(token);
 
+  const isAdmin = Boolean(token);
   const { toast } = useToast();
   const pushNotifs = usePushNotifications(slug);
+
   const [data, setData] = useState<TournamentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -97,6 +170,11 @@ export default function TournamentPage() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [activeTab, setActiveTab] = useState<"bracket" | "schedule" | "registrations">("bracket");
+  const [showManageCategories, setShowManageCategories] = useState(false);
+  const [fppConfirm, setFppConfirm] = useState<{ categoryId: string; description: string; matchFormat: string } | null>(null);
+
+  // Active category tracked in URL (?cat=...)
+  const catParam = searchParams.get("cat") ?? "";
 
   const fetchData = useCallback(async () => {
     try {
@@ -112,15 +190,49 @@ export default function TournamentPage() {
   }, [slug]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-
-  // Real-time updates via SSE (replaces 30s polling)
   useTournamentSSE(slug, fetchData, !isAdmin);
 
-  async function handleGenerate() {
+  function setActiveCat(code: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("cat", code);
+    router.replace(`/tournament/${slug}?${params.toString()}`, { scroll: false });
+  }
+
+  const tournament = data?.tournament;
+  const categories = tournament?.categories ?? [];
+  const hasMultipleCategories = categories.length > 1;
+
+  // Resolve active category
+  const activeCategory = (catParam && categories.find((c) => c.code === catParam))
+    || categories[0]
+    || null;
+
+  async function handleGenerate(categoryId?: string) {
+    const catId = categoryId ?? activeCategory?.id;
+    if (!catId) return;
+
+    // FPP auto: show confirmation with system details
+    if (tournament?.tournamentMode === "fpp_auto") {
+      const cat = categories.find((c) => c.id === catId);
+      const checkedIn = (cat?.players ?? []).filter((p) => p.checkedIn).length;
+      const fppResult = getFppFormatForCategory(checkedIn);
+      setFppConfirm({ categoryId: catId, description: fppResult.description, matchFormat: fppResult.matchFormat });
+      return;
+    }
+
+    await doGenerate(catId);
+  }
+
+  async function doGenerate(categoryId: string) {
+    setFppConfirm(null);
     setGenerating(true);
     setApiError(null);
     try {
-      const res = await fetch(`/api/tournament/${slug}/generate?token=${token}`, { method: "POST" });
+      const res = await fetch(`/api/tournament/${slug}/generate?token=${token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categoryId }),
+      });
       if (!res.ok) {
         const d = await res.json();
         throw new Error(d.error ?? "Erro ao gerar bracket");
@@ -135,17 +247,26 @@ export default function TournamentPage() {
   }
 
   async function handleReset() {
-    if (!confirm("Tens a certeza? Todos os resultados e jogos serão eliminados. Os jogadores e seeds mantêm-se.")) return;
+    const msg = hasMultipleCategories
+      ? `Repor o bracket de "${activeCategory?.code}"? Os jogadores mantêm-se.`
+      : "Tens a certeza? Todos os resultados e jogos serão eliminados. Os jogadores e seeds mantêm-se.";
+    if (!confirm(msg)) return;
+
     setResetting(true);
     setApiError(null);
     try {
-      const res = await fetch(`/api/tournament/${slug}/reset?token=${token}`, { method: "POST" });
+      const body = hasMultipleCategories && activeCategory ? { categoryId: activeCategory.id } : {};
+      const res = await fetch(`/api/tournament/${slug}/reset?token=${token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       if (!res.ok) {
         const d = await res.json();
         throw new Error(d.error ?? "Erro ao repor");
       }
       await fetchData();
-      toast("Bracket eliminado. Torneio em modo rascunho.");
+      toast("Bracket eliminado. Categoria em modo rascunho.");
     } catch (err) {
       setApiError(err instanceof Error ? err.message : "Erro desconhecido");
     } finally {
@@ -157,7 +278,6 @@ export default function TournamentPage() {
     if (!isAdmin) return;
     if (match.status === "bye") return;
     if (!match.team1Id || !match.team2Id) return;
-    // Allow clicking completed matches for re-scoring
     setSelectedMatch(match);
   }
 
@@ -179,39 +299,59 @@ export default function TournamentPage() {
     </div>
   );
 
-  if (apiError || !data) return (
+  if (apiError || !data || !tournament) return (
     <div className="mx-auto max-w-xl px-4 py-16 text-center">
       <p className="text-slate-500">{apiError ?? "Torneio não encontrado"}</p>
     </div>
   );
 
-  const { tournament } = data;
   const isDraft = tournament.status === "draft";
-  const checkedInPlayers = tournament.players.filter((p) => p.checkedIn);
-  const canGenerate = isDraft && checkedInPlayers.length >= 2;
-  const bracketUrl = token ? `/tournament/${slug}/bracket?token=${token}` : `/tournament/${slug}/bracket`;
+  const activeCategoryDraft = activeCategory?.status === "draft";
+  const activeCategoryPlayers = activeCategory?.players ?? [];
+  const checkedInPlayers = activeCategoryPlayers.filter((p) => p.checkedIn);
+  const canGenerate = activeCategoryDraft && checkedInPlayers.length >= 2;
+  const bracketUrl = token
+    ? `/tournament/${slug}/bracket?token=${token}${activeCategory ? `&cat=${activeCategory.code}` : ""}`
+    : `/tournament/${slug}/bracket${activeCategory ? `?cat=${activeCategory.code}` : ""}`;
+
+  const activeMatchFormat = activeCategory?.matchFormat ?? tournament.matchFormat;
+  const tournamentFormat = tournament.format;
+  const tournamentGroupCount = tournament.groupCount;
 
   function renderBracket() {
-    const { matches, players, format, groupCount } = tournament;
-    if (format === "single_elimination") return <SingleEliminationBracket matches={matches} isAdmin={isAdmin} onMatchClick={handleMatchClick} />;
-    if (format === "double_elimination") return <DoubleEliminationBracket matches={matches} isAdmin={isAdmin} onMatchClick={handleMatchClick} />;
-    if (format === "round_robin") return <RoundRobinTable matches={matches} players={players} isAdmin={isAdmin} onMatchClick={handleMatchClick} />;
-    if (format === "groups_knockout") return <GroupStageView matches={matches} players={players} isAdmin={isAdmin} onMatchClick={handleMatchClick} groupCount={groupCount ?? 2} />;
-    if (format === "fpp_auto") {
-      if ((groupCount ?? 0) > 0) {
-        return <GroupStageView matches={matches} players={players} isAdmin={isAdmin} onMatchClick={handleMatchClick} groupCount={groupCount!} />;
+    if (!activeCategory) return null;
+    const catMatches = activeCategory.matches ?? [];
+    const catPlayers = activeCategory.players ?? [];
+    const catFormat = activeCategory.format ?? tournamentFormat;
+
+    if (catFormat === "single_elimination") {
+      return <SingleEliminationBracket matches={catMatches} isAdmin={isAdmin} onMatchClick={handleMatchClick} />;
+    }
+    if (catFormat === "double_elimination") {
+      return <DoubleEliminationBracket matches={catMatches} isAdmin={isAdmin} onMatchClick={handleMatchClick} />;
+    }
+    if (catFormat === "round_robin") {
+      return <RoundRobinTable matches={catMatches} players={catPlayers} isAdmin={isAdmin} onMatchClick={handleMatchClick} />;
+    }
+    if (catFormat === "groups_knockout") {
+      const gc = activeCategory.groupCount ?? tournamentGroupCount ?? 2;
+      return <GroupStageView matches={catMatches} players={catPlayers} isAdmin={isAdmin} onMatchClick={handleMatchClick} groupCount={gc} />;
+    }
+    if (catFormat === "fpp_auto" || (!catFormat && tournamentFormat === "fpp_auto")) {
+      const gc = activeCategory.groupCount ?? tournamentGroupCount ?? 0;
+      if (gc > 0) {
+        return <GroupStageView matches={catMatches} players={catPlayers} isAdmin={isAdmin} onMatchClick={handleMatchClick} groupCount={gc} />;
       }
-      return <SingleEliminationBracket matches={matches} isAdmin={isAdmin} onMatchClick={handleMatchClick} />;
+      return <SingleEliminationBracket matches={catMatches} isAdmin={isAdmin} onMatchClick={handleMatchClick} />;
     }
     return null;
   }
 
-  // ── Bottom nav config ────────────────────────────────────────────────────────
-  const showBottomNav = !isDraft;
+  const showBottomNav = !isDraft && !activeCategoryDraft;
 
   const adminNavItems = [
-    { key: "bracket" as const, label: "Bracket", icon: <IconBracket /> },
-    { key: "schedule" as const, label: "Agenda", icon: <IconCalendar /> },
+    { key: "bracket" as const,       label: "Bracket",    icon: <IconBracket /> },
+    { key: "schedule" as const,      label: "Agenda",     icon: <IconCalendar /> },
     { key: "registrations" as const, label: "Inscrições", icon: <IconUsers /> },
   ];
 
@@ -221,25 +361,19 @@ export default function TournamentPage() {
 
       {isAdmin && <LinkShare slug={slug} adminToken={token} />}
 
-      {/* Public quick links — hidden on mobile (bottom nav covers this) */}
+      {/* Public quick links */}
       {!isAdmin && !isDraft && (
         <div className="hidden sm:flex items-center gap-4 mb-4 text-sm">
           <Link href={`/tournament/${slug}/stats`} className="text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1">
-            <IconStats />
-            Estatísticas
+            <IconStats /> Estatísticas
           </Link>
           <Link href={`/tournament/${slug}/minha-dupla`} className="text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1">
-            <IconPerson />
-            Os meus jogos
+            <IconPerson /> Os meus jogos
           </Link>
           {pushNotifs.supported && (
             <button
               onClick={() => pushNotifs.subscribed ? pushNotifs.unsubscribe() : pushNotifs.subscribe()}
-              className={`flex items-center gap-1 transition-colors ${
-                pushNotifs.subscribed
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400"
-              }`}
+              className={`flex items-center gap-1 transition-colors ${pushNotifs.subscribed ? "text-emerald-600 dark:text-emerald-400" : "text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400"}`}
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill={pushNotifs.subscribed ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
                 <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" />
@@ -257,25 +391,71 @@ export default function TournamentPage() {
         </div>
       )}
 
-      {/* Draft state */}
-      {isDraft ? (
+      {/* ── Category tabs (if multiple categories) ── */}
+      {hasMultipleCategories && (
+        <div className="mb-4">
+          <div className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-slate-200 dark:border-slate-700 scrollbar-none">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCat(cat.code)}
+                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-t-lg transition-colors border-b-2 -mb-px ${
+                  activeCategory?.id === cat.id
+                    ? "border-emerald-600 text-emerald-600 dark:text-emerald-400 dark:border-emerald-400"
+                    : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                }`}
+              >
+                {cat.code}
+                <Badge variant={STATUS_VARIANT[cat.status]} className="text-[10px] px-1 py-0">
+                  {STATUS_LABEL[cat.status]}
+                </Badge>
+              </button>
+            ))}
+            {isAdmin && isDraft && (
+              <button
+                onClick={() => setShowManageCategories(true)}
+                className="ml-auto flex-shrink-0 text-xs text-slate-400 hover:text-emerald-600 transition-colors px-2 py-1"
+              >
+                + Gerir categorias
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Content area ── */}
+      {activeCategoryDraft ? (
+        /* Draft category — setup view */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1 space-y-4">
-            <PlayerList players={tournament.players} slug={slug} token={token} onUpdate={fetchData} disabled={!isAdmin} />
+            <PlayerList
+              players={activeCategoryPlayers}
+              slug={slug}
+              token={token}
+              categoryId={activeCategory?.id ?? null}
+              onUpdate={fetchData}
+              disabled={!isAdmin}
+            />
             {isAdmin && tournament.registrationOpen && (
-              <RegistrationPanel slug={slug} token={token} onApproved={fetchData} />
+              <RegistrationPanel
+                slug={slug}
+                token={token}
+                categories={categories}
+                activeCategoryId={activeCategory?.id ?? null}
+                onApproved={fetchData}
+              />
             )}
             {isAdmin && (
               <>
                 {apiError && <p className="text-sm text-red-600 dark:text-red-400">{apiError}</p>}
-                <Button size="lg" className="w-full" disabled={!canGenerate} loading={generating} onClick={handleGenerate}>
-                  Gerar Bracket
+                <Button size="lg" className="w-full" disabled={!canGenerate} loading={generating} onClick={() => handleGenerate()}>
+                  Gerar Bracket{hasMultipleCategories ? ` — ${activeCategory?.code}` : ""}
                 </Button>
-                {tournament.format === "fpp_auto" && (
+                {tournament.tournamentMode === "fpp_auto" && activeCategory && (
                   <p className="text-xs text-center text-slate-500 dark:text-slate-400">
                     {checkedInPlayers.length >= 2
-                      ? <>FPP: {getFPPConfig(checkedInPlayers.length).description}</>
-                      : "Regulamento FPP — o sistema é escolhido quando gerado"}
+                      ? <>FPP: {getFppFormatForCategory(checkedInPlayers.length).description}</>
+                      : "FPP — sistema determinado quando gerado"}
                   </p>
                 )}
                 {!canGenerate && (
@@ -304,6 +484,7 @@ export default function TournamentPage() {
           </div>
         </div>
       ) : (
+        /* In-progress / completed — bracket view */
         <div className="space-y-6">
           {tournament.status === "completed" && (
             <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 px-6 py-4 text-center">
@@ -311,7 +492,6 @@ export default function TournamentPage() {
             </div>
           )}
 
-          {/* Desktop tabs (admin only) */}
           {isAdmin && (
             <div className="hidden sm:flex gap-1 border-b border-slate-200 dark:border-slate-700">
               {adminNavItems.map(({ key, label }) => (
@@ -333,7 +513,7 @@ export default function TournamentPage() {
                   disabled={resetting}
                   className="px-3 py-1.5 text-xs font-medium text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  {resetting ? "A repor…" : "Repor Bracket"}
+                  {resetting ? "A repor…" : `Repor${hasMultipleCategories && activeCategory ? ` ${activeCategory.code}` : " Bracket"}`}
                 </button>
               </div>
             </div>
@@ -342,7 +522,7 @@ export default function TournamentPage() {
           {(!isAdmin || activeTab === "bracket") && (
             <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
               <div className="xl:col-span-1 space-y-3 hidden xl:block">
-                <PlayerList players={tournament.players} slug={slug} token={token} onUpdate={fetchData} disabled />
+                <PlayerList players={activeCategoryPlayers} slug={slug} token={token} categoryId={activeCategory?.id ?? null} onUpdate={fetchData} disabled />
                 <Link href={`/tournament/${slug}/stats`} className="block text-center text-xs text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors py-2">
                   Ver estatísticas →
                 </Link>
@@ -351,32 +531,17 @@ export default function TournamentPage() {
                 <Card padding="md">
                   <div className="flex items-center justify-end gap-3 mb-3">
                     <div className="flex items-center gap-2 mr-auto">
-                      <a
-                        href={`/api/tournament/${slug}/export?format=csv`}
-                        download
-                        className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-                      >
+                      <a href={`/api/tournament/${slug}/export?format=csv`} download className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
                         <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         CSV
                       </a>
-                      <a
-                        href={`/api/tournament/${slug}/export?format=ical`}
-                        download
-                        className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-                      >
+                      <a href={`/api/tournament/${slug}/export?format=ical`} download className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
                         <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18" /></svg>
                         iCal
                       </a>
                     </div>
-                    <a
-                      href={bracketUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-                    >
-                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                      </svg>
+                    <a href={bracketUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors">
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
                       Ecrã completo
                     </a>
                   </div>
@@ -387,11 +552,31 @@ export default function TournamentPage() {
           )}
 
           {isAdmin && activeTab === "schedule" && (
-            <ScheduleManager tournament={tournament} matches={tournament.matches} token={token} onUpdate={fetchData} />
+            <ScheduleManager tournament={tournament} matches={activeCategory?.matches ?? tournament.matches} token={token} onUpdate={fetchData} />
           )}
           {isAdmin && activeTab === "registrations" && (
-            <RegistrationPanel slug={slug} token={token} onApproved={fetchData} />
+            <RegistrationPanel slug={slug} token={token} categories={categories} activeCategoryId={activeCategory?.id ?? null} onApproved={fetchData} />
           )}
+        </div>
+      )}
+
+      {/* FPP auto confirmation dialog */}
+      {fppConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-sm p-5 space-y-4">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Confirmar Geração FPP</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Com <strong>{checkedInPlayers.length}</strong> duplas confirmadas o sistema será:
+            </p>
+            <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-300">
+              <p className="font-semibold">{fppConfirm.description}</p>
+              <p className="text-xs mt-0.5 opacity-80">Formato: {fppConfirm.matchFormat}</p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setFppConfirm(null)}>Cancelar</Button>
+              <Button loading={generating} onClick={() => doGenerate(fppConfirm.categoryId)}>Confirmar</Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -399,12 +584,21 @@ export default function TournamentPage() {
         match={selectedMatch}
         slug={slug}
         token={token}
-        matchFormat={tournament.matchFormat}
+        matchFormat={activeMatchFormat}
         onClose={() => setSelectedMatch(null)}
         onSaved={fetchData}
       />
 
-      {/* ── Mobile bottom nav ──────────────────────────────────────────────── */}
+      {showManageCategories && (
+        <ManageCategoriesModal
+          slug={slug}
+          token={token}
+          categories={categories}
+          onClose={() => setShowManageCategories(false)}
+          onUpdate={fetchData}
+        />
+      )}
+
       {showBottomNav && (
         <>
           {isAdmin ? (
@@ -413,11 +607,7 @@ export default function TournamentPage() {
                 <button
                   key={key}
                   onClick={() => setActiveTab(key)}
-                  className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
-                    activeTab === key
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-slate-400 dark:text-slate-500"
-                  }`}
+                  className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${activeTab === key ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"}`}
                 >
                   {icon}
                   {label}

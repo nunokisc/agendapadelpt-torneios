@@ -6,16 +6,24 @@ import Link from "next/link";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import type { Category } from "@/types";
+
+interface TournamentInfo {
+  name: string;
+  registrationOpen: boolean;
+  categories: Category[];
+}
 
 export default function RegisterPage() {
   const { slug } = useParams<{ slug: string }>();
-  const [tournament, setTournament] = useState<{ name: string; registrationOpen: boolean } | null>(null);
+  const [tournament, setTournament] = useState<TournamentInfo | null>(null);
   const [loadingTournament, setLoadingTournament] = useState(true);
 
   const [player1, setPlayer1] = useState("");
   const [player2, setPlayer2] = useState("");
   const [teamName, setTeamName] = useState("");
   const [contact, setContact] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [showTeamName, setShowTeamName] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -24,19 +32,36 @@ export default function RegisterPage() {
   useEffect(() => {
     fetch(`/api/tournament/${slug}`)
       .then((r) => r.json())
-      .then((d) => setTournament(d.tournament))
+      .then((d) => {
+        const t = d.tournament;
+        setTournament({
+          name: t.name,
+          registrationOpen: t.registrationOpen,
+          categories: t.categories ?? [],
+        });
+        // Pre-select if only one category
+        if (t.categories?.length === 1) setCategoryId(t.categories[0].id);
+      })
       .catch(() => setTournament(null))
       .finally(() => setLoadingTournament(false));
   }, [slug]);
 
+  const hasMultipleCategories = (tournament?.categories?.length ?? 0) > 1;
+  const categoryRequired = hasMultipleCategories && !categoryId;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (categoryRequired) {
+      setError("Selecciona a série em que queres competir.");
+      return;
+    }
     setSubmitting(true);
     try {
       const body: Record<string, string> = { player1: player1.trim(), player2: player2.trim() };
       if (teamName.trim()) body.teamName = teamName.trim();
       if (contact.trim()) body.contact = contact.trim();
+      if (categoryId) body.categoryId = categoryId;
 
       const res = await fetch(`/api/tournament/${slug}/register`, {
         method: "POST",
@@ -75,9 +100,7 @@ export default function RegisterPage() {
         <p className="text-2xl mb-2">🔒</p>
         <h1 className="text-lg font-bold text-slate-800 dark:text-slate-100">{tournament.name}</h1>
         <p className="mt-2 text-slate-500">As inscrições estão fechadas.</p>
-        <Link href={`/tournament/${slug}`} className="mt-4 inline-block text-sm text-emerald-600 hover:underline">
-          Ver torneio →
-        </Link>
+        <Link href={`/tournament/${slug}`} className="mt-4 inline-block text-sm text-emerald-600 hover:underline">Ver torneio →</Link>
       </div>
     );
   }
@@ -87,12 +110,8 @@ export default function RegisterPage() {
       <div className="mx-auto max-w-md px-4 py-16 text-center">
         <p className="text-4xl mb-4">🎾</p>
         <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Inscrição enviada!</h1>
-        <p className="mt-2 text-slate-500 text-sm">
-          A tua dupla foi submetida. O organizador irá confirmar a inscrição.
-        </p>
-        <Link href={`/tournament/${slug}`} className="mt-6 inline-block text-sm text-emerald-600 hover:underline">
-          Ver torneio →
-        </Link>
+        <p className="mt-2 text-slate-500 text-sm">A tua dupla foi submetida. O organizador irá confirmar a inscrição.</p>
+        <Link href={`/tournament/${slug}`} className="mt-6 inline-block text-sm text-emerald-600 hover:underline">Ver torneio →</Link>
       </div>
     );
   }
@@ -110,23 +129,32 @@ export default function RegisterPage() {
       <Card>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Jogador 1"
-              placeholder="Nome completo"
-              value={player1}
-              onChange={(e) => setPlayer1(e.target.value)}
-              required
-              disabled={submitting}
-            />
-            <Input
-              label="Jogador 2"
-              placeholder="Nome completo"
-              value={player2}
-              onChange={(e) => setPlayer2(e.target.value)}
-              required
-              disabled={submitting}
-            />
+            <Input label="Jogador 1" placeholder="Nome completo" value={player1} onChange={(e) => setPlayer1(e.target.value)} required disabled={submitting} />
+            <Input label="Jogador 2" placeholder="Nome completo" value={player2} onChange={(e) => setPlayer2(e.target.value)} required disabled={submitting} />
           </div>
+
+          {/* Category selector — only if multiple categories */}
+          {hasMultipleCategories && (
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Série <span className="text-red-500">*</span>
+              </label>
+              <select
+                className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                required
+                disabled={submitting}
+              >
+                <option value="">-- Seleccionar série --</option>
+                {tournament.categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.code} — {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {showTeamName ? (
             <div className="flex gap-2 items-end">
@@ -158,7 +186,7 @@ export default function RegisterPage() {
 
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-          <Button type="submit" loading={submitting} className="w-full" disabled={!player1.trim() || !player2.trim()}>
+          <Button type="submit" loading={submitting} className="w-full" disabled={!player1.trim() || !player2.trim() || categoryRequired}>
             Enviar inscrição
           </Button>
         </form>

@@ -17,12 +17,8 @@ export async function PUT(
   const token = extractAdminToken(req, slug);
 
   const tournament = await prisma.tournament.findUnique({ where: { slug } });
-  if (!tournament) {
-    return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
-  }
-  if (tournament.adminToken !== token) {
-    return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
-  }
+  if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
+  if (tournament.adminToken !== token) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
 
   const match = await prisma.match.findUnique({
     where: { id: matchId },
@@ -36,47 +32,41 @@ export async function PUT(
     return NextResponse.json({ error: "Jogo ainda não tem as duas duplas" }, { status: 400 });
   }
 
-  // Allow re-scoring completed matches — check next match hasn't been completed
   if (match.status === "completed" && match.nextMatchId) {
     const nextMatch = await prisma.match.findUnique({ where: { id: match.nextMatchId } });
     if (nextMatch && nextMatch.status === "completed") {
-      return NextResponse.json(
-        { error: "Não é possível editar: o jogo seguinte já tem resultado" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Não é possível editar: o jogo seguinte já tem resultado" }, { status: 400 });
     }
   }
   if (match.status === "completed" && match.loserNextMatchId) {
     const loserNext = await prisma.match.findUnique({ where: { id: match.loserNextMatchId } });
     if (loserNext && loserNext.status === "completed") {
-      return NextResponse.json(
-        { error: "Não é possível editar: o jogo do losers bracket seguinte já tem resultado" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Não é possível editar: o jogo do losers bracket seguinte já tem resultado" }, { status: 400 });
     }
   }
 
   const body = await req.json();
   const parsed = scoreSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+
+  // Resolve matchFormat: category.matchFormat > tournament.matchFormat > default
+  let resolvedMatchFormat = tournament.matchFormat || "M3SPO";
+  if (match.categoryId) {
+    const category = await prisma.category.findUnique({ where: { id: match.categoryId } });
+    if (category?.matchFormat) resolvedMatchFormat = category.matchFormat;
   }
+  const matchFormat = resolvedMatchFormat as MatchFormat;
 
   const scores: SetScore[] = parsed.data.scores;
-  const matchFormat = (tournament.matchFormat || "M3SPO") as MatchFormat;
 
   const validation = validateScores(scores, matchFormat);
-  if (!validation.valid) {
-    return NextResponse.json({ error: validation.error ?? "Resultado inválido" }, { status: 400 });
-  }
+  if (!validation.valid) return NextResponse.json({ error: validation.error ?? "Resultado inválido" }, { status: 400 });
 
   const matchWinner = determineMatchWinner(scores, matchFormat);
-  if (!matchWinner) {
-    return NextResponse.json({ error: "Resultado ainda não tem vencedor" }, { status: 400 });
-  }
+  if (!matchWinner) return NextResponse.json({ error: "Resultado ainda não tem vencedor" }, { status: 400 });
 
   const winnerId = matchWinner === 1 ? match.team1Id : match.team2Id;
-  const loserId = matchWinner === 1 ? match.team2Id : match.team1Id;
+  const loserId  = matchWinner === 1 ? match.team2Id : match.team1Id;
 
   const result = await prisma.$transaction(async (tx) => {
     // 1. Save the result
@@ -89,25 +79,25 @@ export async function PUT(
     // 2. Propagate winner to next knockout match
     if (match.nextMatchId) {
       const slot = match.nextMatchSlot === 2 ? "team2Id" : "team1Id";
-      await tx.match.update({
-        where: { id: match.nextMatchId },
-        data: { [slot]: winnerId },
-      });
+      await tx.match.update({ where: { id: match.nextMatchId }, data: { [slot]: winnerId } });
     }
 
     // 3. Propagate loser (double elimination)
     if (match.loserNextMatchId) {
       const slot = match.loserNextSlot === 2 ? "team2Id" : "team1Id";
-      await tx.match.update({
-        where: { id: match.loserNextMatchId },
-        data: { [slot]: loserId },
-      });
+      await tx.match.update({ where: { id: match.loserNextMatchId }, data: { [slot]: loserId } });
     }
 
-    // 4. For groups_knockout / fpp_auto: when all group matches finish, generate knockout
-    if ((tournament.format === "groups_knockout" || tournament.format === "fpp_auto") && match.bracketType === "group") {
+    // 4. For groups phase: trigger knockout generation when all group matches done
+    const isGroupPhase =
+      (tournament.format === "groups_knockout" || tournament.format === "fpp_auto" || match.categoryId) &&
+      match.bracketType === "group";
+
+    if (isGroupPhase) {
+      const categoryFilter = match.categoryId ? { categoryId: match.categoryId } : { tournamentId: tournament.id };
+
       const allGroupMatches = await tx.match.findMany({
-        where: { tournamentId: tournament.id, bracketType: "group" },
+        where: { ...categoryFilter, bracketType: "group" },
         select: { status: true, team1Id: true, team2Id: true, winnerId: true, scores: true, groupIndex: true },
       });
 
@@ -117,16 +107,24 @@ export async function PUT(
 
       if (allGroupDone) {
         const knockoutCount = await tx.match.count({
-          where: { tournamentId: tournament.id, bracketType: { not: "group" } },
+          where: { ...categoryFilter, bracketType: { not: "group" } },
         });
 
         if (knockoutCount === 0) {
-          const groupCount = tournament.groupCount ?? 2;
-          const advanceCount = tournament.advanceCount ?? 2;
+          // Determine group config from category or tournament
+          let groupCount = tournament.groupCount ?? 2;
+          let advanceCount = tournament.advanceCount ?? 2;
 
-          // Compute standings per group and collect advancing players
-          // Cross-group seeding: 1sts interleaved with reversed 2nds to avoid same-group matchups
-          const advancingByPosition: { playerId: string; groupIndex: number }[][] = Array.from({ length: advanceCount }, () => []);
+          if (match.categoryId) {
+            const cat = await tx.category.findUnique({ where: { id: match.categoryId } });
+            if (cat) {
+              groupCount = cat.groupCount ?? groupCount;
+              advanceCount = cat.advanceCount ?? advanceCount;
+            }
+          }
+
+          const advancingByPosition: { playerId: string; groupIndex: number }[][] =
+            Array.from({ length: advanceCount }, () => []);
 
           for (let g = 0; g < groupCount; g++) {
             const gMatches = allGroupMatches.filter((m) => m.groupIndex === g);
@@ -142,11 +140,8 @@ export async function PUT(
             }
           }
 
-          // Seeding order for knockout bracket
-          // fpp_auto uses FPP cross-group rules (no same-group R1 matchups)
-          // groups_knockout uses legacy alternating-reverse order
           let advancingPlayers: string[];
-          if (tournament.format === "fpp_auto") {
+          if (tournament.tournamentMode === "fpp_auto" || tournament.format === "fpp_auto") {
             advancingPlayers = fppKnockoutOrder(advancingByPosition, groupCount);
           } else {
             advancingPlayers = [];
@@ -155,19 +150,18 @@ export async function PUT(
               if (pos % 2 === 0) {
                 advancingPlayers.push(...group.map((g) => g.playerId));
               } else {
-                advancingPlayers.push(...group.reverse().map((g) => g.playerId));
+                advancingPlayers.push(...[...group].reverse().map((g) => g.playerId));
               }
             }
           }
 
-          // Generate single elimination knockout bracket
           const knockoutInputs = generateSingleElimination(advancingPlayers.length, false);
-
           const created = await Promise.all(
             knockoutInputs.map((m) =>
               tx.match.create({
                 data: {
                   tournamentId: tournament.id,
+                  categoryId: match.categoryId,
                   round: m.round,
                   position: m.position,
                   bracketType: m.bracketType,
@@ -180,7 +174,6 @@ export async function PUT(
             )
           );
 
-          // Wire nextMatchId references
           await Promise.all(
             knockoutInputs.map((m, idx) => {
               const updates: Record<string, string | number | null> = {};
@@ -197,15 +190,12 @@ export async function PUT(
             })
           );
 
-          // Auto-advance byes in knockout
           for (const m of knockoutInputs) {
             if (m.status !== "bye") continue;
             const byeWinner =
-              m.team1Index != null
-                ? advancingPlayers[m.team1Index]
-                : m.team2Index != null
-                ? advancingPlayers[m.team2Index]
-                : null;
+              m.team1Index != null ? advancingPlayers[m.team1Index]
+              : m.team2Index != null ? advancingPlayers[m.team2Index]
+              : null;
             if (byeWinner && m.nextMatchIndex != null) {
               const slot = m.nextMatchSlot === 2 ? "team2Id" : "team1Id";
               await tx.match.update({
@@ -218,18 +208,29 @@ export async function PUT(
       }
     }
 
-    // 5. Check if all matches are done → complete tournament
+    // 5. Check if all matches in the category (or tournament) are done
+    const categoryFilter = match.categoryId ? { categoryId: match.categoryId } : { tournamentId: tournament.id };
+
     const remaining = await tx.match.count({
-      where: {
-        tournamentId: tournament.id,
-        status: { in: ["pending", "in_progress"] },
-      },
+      where: { ...categoryFilter, status: { in: ["pending", "in_progress"] } },
     });
+
     if (remaining === 0) {
-      await tx.tournament.update({
-        where: { id: tournament.id },
-        data: { status: "completed" },
-      });
+      if (match.categoryId) {
+        await tx.category.update({
+          where: { id: match.categoryId },
+          data: { status: "completed" },
+        });
+        // Check if all categories are done
+        const incompleteCats = await tx.category.count({
+          where: { tournamentId: tournament.id, status: { not: "completed" } },
+        });
+        if (incompleteCats === 0) {
+          await tx.tournament.update({ where: { id: tournament.id }, data: { status: "completed" } });
+        }
+      } else {
+        await tx.tournament.update({ where: { id: tournament.id }, data: { status: "completed" } });
+      }
     }
 
     return { match: updatedMatch };

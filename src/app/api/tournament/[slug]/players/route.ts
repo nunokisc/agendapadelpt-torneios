@@ -11,20 +11,28 @@ export async function POST(
   const token = extractAdminToken(req, slug);
 
   const tournament = await prisma.tournament.findUnique({ where: { slug } });
-  if (!tournament) {
-    return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
-  }
-  if (tournament.adminToken !== token) {
-    return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
-  }
-  if (tournament.status !== "draft") {
-    return NextResponse.json({ error: "Torneio já em progresso" }, { status: 400 });
-  }
+  if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
+  if (tournament.adminToken !== token) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
+  if (tournament.status !== "draft") return NextResponse.json({ error: "Torneio já em progresso" }, { status: 400 });
 
   const body = await req.json();
   const parsed = addPlayersSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+
+  // Resolve categoryId: use provided value or fall back to the first category
+  const categoryId: string | null = body.categoryId ?? null;
+  let resolvedCategoryId = categoryId;
+  if (!resolvedCategoryId) {
+    const firstCategory = await prisma.category.findFirst({
+      where: { tournamentId: tournament.id },
+      orderBy: { order: "asc" },
+    });
+    resolvedCategoryId = firstCategory?.id ?? null;
+  } else {
+    const cat = await prisma.category.findUnique({ where: { id: resolvedCategoryId } });
+    if (!cat || cat.tournamentId !== tournament.id) {
+      return NextResponse.json({ error: "Categoria não encontrada" }, { status: 404 });
+    }
   }
 
   const teams =
@@ -44,6 +52,7 @@ export async function POST(
           player2Name: team.player2.trim(),
           seed: currentCount + i + 1,
           tournamentId: tournament.id,
+          categoryId: resolvedCategoryId,
         },
       });
     })
@@ -61,21 +70,13 @@ export async function PUT(
   const token = extractAdminToken(req, slug);
 
   const tournament = await prisma.tournament.findUnique({ where: { slug } });
-  if (!tournament) {
-    return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
-  }
-  if (tournament.adminToken !== token) {
-    return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
-  }
-  if (tournament.status !== "draft") {
-    return NextResponse.json({ error: "Torneio já em progresso" }, { status: 400 });
-  }
+  if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
+  if (tournament.adminToken !== token) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
+  if (tournament.status !== "draft") return NextResponse.json({ error: "Torneio já em progresso" }, { status: 400 });
 
   const body = await req.json();
   const order: { id: string; seed: number }[] = body.order;
-  if (!Array.isArray(order)) {
-    return NextResponse.json({ error: "order[] é obrigatório" }, { status: 400 });
-  }
+  if (!Array.isArray(order)) return NextResponse.json({ error: "order[] é obrigatório" }, { status: 400 });
 
   await prisma.$transaction(
     order.map(({ id, seed }) =>
@@ -89,7 +90,7 @@ export async function PUT(
   return NextResponse.json({ success: true });
 }
 
-// PATCH — toggle check-in status
+// PATCH — toggle check-in
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -123,22 +124,13 @@ export async function DELETE(
   const token = extractAdminToken(req, slug);
   const playerId = req.nextUrl.searchParams.get("playerId");
 
-  if (!playerId) {
-    return NextResponse.json({ error: "playerId é obrigatório" }, { status: 400 });
-  }
+  if (!playerId) return NextResponse.json({ error: "playerId é obrigatório" }, { status: 400 });
 
   const tournament = await prisma.tournament.findUnique({ where: { slug } });
-  if (!tournament) {
-    return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
-  }
-  if (tournament.adminToken !== token) {
-    return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
-  }
-  if (tournament.status !== "draft") {
-    return NextResponse.json({ error: "Torneio já em progresso" }, { status: 400 });
-  }
+  if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
+  if (tournament.adminToken !== token) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
+  if (tournament.status !== "draft") return NextResponse.json({ error: "Torneio já em progresso" }, { status: 400 });
 
   await prisma.player.delete({ where: { id: playerId, tournamentId: tournament.id } });
-
   return NextResponse.json({ success: true });
 }

@@ -3,6 +3,11 @@ import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { extractAdminToken } from "@/lib/auth-server";
 
+const matchInclude = {
+  include: { team1: true, team2: true, winner: true },
+  orderBy: [{ round: "asc" as const }, { position: "asc" as const }],
+};
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -11,11 +16,15 @@ export async function GET(
   const tournament = await prisma.tournament.findUnique({
     where: { slug },
     include: {
-      players: { orderBy: { seed: "asc" } },
-      matches: {
-        include: { team1: true, team2: true, winner: true },
-        orderBy: [{ round: "asc" }, { position: "asc" }],
+      categories: {
+        orderBy: { order: "asc" },
+        include: {
+          players: { orderBy: { seed: "asc" } },
+          matches: matchInclude,
+        },
       },
+      players: { orderBy: { seed: "asc" } },
+      matches: matchInclude,
     },
   });
 
@@ -29,7 +38,7 @@ export async function GET(
 const patchSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   description: z.string().max(500).nullable().optional(),
-  matchFormat: z.enum(["A1","A2","B1","B2","C1","C2","D1","D2","E","F"]).optional(),
+  matchFormat: z.enum(["PRO","PROPO","M3S","M3SPO","M3","M3PO","A1","A2","B1","B2","C1","C2","D1","D2","E","F"]).optional(),
   thirdPlace: z.boolean().optional(),
   isPublic: z.boolean().optional(),
   registrationOpen: z.boolean().optional(),
@@ -52,7 +61,6 @@ export async function PATCH(
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
 
-  // matchFormat and thirdPlace only editable while draft
   const data: Record<string, unknown> = { ...parsed.data };
   if (tournament.status !== "draft") {
     delete data.matchFormat;

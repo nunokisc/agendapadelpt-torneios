@@ -10,12 +10,14 @@ export const createTournamentSchema = z.object({
     "groups_knockout",
     "fpp_auto",
   ]),
+  tournamentMode: z.enum(["manual", "fpp_auto"]).optional().default("manual"),
   matchFormat: z.enum(['PRO', 'PROPO', 'M3S', 'M3SPO', 'M3', 'M3PO', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'D1', 'D2', 'E', 'F']).default('M3SPO'),
   thirdPlace: z.boolean().optional().default(false),
   starPoint: z.boolean().optional().default(false),
   groupCount: z.number().int().min(2).max(8).optional(),
   advanceCount: z.number().int().min(1).max(4).optional(),
   courtCount: z.number().int().min(1).max(99).optional().default(1),
+  categories: z.array(z.string().min(1).max(20)).min(1).optional(),
 });
 
 export const addTeamSchema = z.object({

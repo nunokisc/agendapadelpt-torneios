@@ -7,27 +7,52 @@ datasource db {
 }
 
 model Tournament {
-  id          String   @id @default(cuid())
-  slug        String   @unique
-  adminToken  String   @unique
-  name        String
-  description String?
-  format      String
-  status      String   @default("draft")
-  matchFormat String   @default("M3SPO")
-  starPoint   Boolean  @default(false)
-  thirdPlace  Boolean  @default(false)
-  groupCount  Int?
-  advanceCount Int?
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  adminToken      String   @unique
+  name            String
+  description     String?
+  format          String
+  status          String   @default("draft")
+  tournamentMode  String   @default("manual")
+  matchFormat     String   @default("M3SPO")
+  starPoint       Boolean  @default(false)
+  thirdPlace      Boolean  @default(false)
+  groupCount      Int?
+  advanceCount    Int?
   isPublic         Boolean @default(false)
   registrationOpen Boolean @default(false)
   courtCount       Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  categories    Category[]
   players       Player[]
   matches       Match[]
   registrations Registration[]
+}
+
+model Category {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  code         String
+  name         String
+  matchFormat  String?
+  starPoint    Boolean    @default(false)
+  status       String     @default("draft")
+  order        Int        @default(0)
+  groupCount   Int?
+  advanceCount Int?
+  format       String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  players       Player[]
+  matches       Match[]
+  registrations Registration[]
+
+  @@unique([tournamentId, code])
 }
 
 model Player {
@@ -39,6 +64,8 @@ model Player {
   checkedIn    Boolean @default(true)
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  categoryId   String?
+  category     Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   groupIndex   Int?
 
   matchesAsTeam1 Match[] @relation("Team1")
@@ -50,6 +77,8 @@ model Match {
   id            String  @id @default(cuid())
   tournamentId  String
   tournament    Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  categoryId    String?
+  category      Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   round         Int
   position      Int
@@ -82,6 +111,8 @@ model Registration {
   id           String   @id @default(cuid())
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  categoryId   String?
+  category     Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   player1Name  String
   player2Name  String
   teamName     String?

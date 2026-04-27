@@ -84,7 +84,8 @@ if (isMySQL) {
     { id: "setup-doubles",  name: "20260424_doubles" },
     { id: "setup-features", name: "20260424_features" },
     { id: "setup-checkin",  name: "20260425_checkin" },
-    { id: "setup-starpoint", name: "20260426_starpoint" },
+    { id: "setup-starpoint",   name: "20260426_starpoint" },
+    { id: "setup-categories", name: "20260427_categories" },
   ];
 
   const db = new Database(dbPath);
