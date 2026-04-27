@@ -116,13 +116,14 @@ export default function RoundRobinTable({ matches, players, isAdmin, onMatchClic
             <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
               Ronda {ri + 1}
             </h4>
-            <div className="flex flex-wrap gap-3">
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-[repeat(auto-fill,260px)]">
               {roundMatches.map((m) => (
                 <MatchCard
                   key={m.id}
                   match={m}
                   isAdmin={isAdmin}
                   onClick={() => onMatchClick(m)}
+                  compact
                 />
               ))}
             </div>

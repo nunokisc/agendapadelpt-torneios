@@ -64,7 +64,7 @@ export default function DoubleEliminationBracket({ matches, isAdmin, onMatchClic
               <div key={r} className="space-y-2">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Losers L{r}</p>
                 {(losersByRound.get(r) ?? []).map((m) => (
-                  <MatchCard key={m.id} match={m} isAdmin={isAdmin} onClick={() => onMatchClick(m)} />
+                  <MatchCard key={m.id} match={m} isAdmin={isAdmin} onClick={() => onMatchClick(m)} compact />
                 ))}
               </div>
             ))}
@@ -74,7 +74,7 @@ export default function DoubleEliminationBracket({ matches, isAdmin, onMatchClic
           <div className="space-y-2">
             <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Grand Final</p>
             {finals.map((m) => (
-              <MatchCard key={m.id} match={m} isAdmin={isAdmin} onClick={() => onMatchClick(m)} />
+              <MatchCard key={m.id} match={m} isAdmin={isAdmin} onClick={() => onMatchClick(m)} compact />
             ))}
           </div>
         )}

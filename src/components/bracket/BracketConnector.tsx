@@ -1,5 +1,5 @@
 // SVG connector lines between bracket rounds.
-// Draws an elbow: vertical from source mid → horizontal → vertical to target mid.
+// Draws a smooth cubic-bezier curve from source card right-edge to target card left-edge.
 
 interface ConnectorProps {
   x1: number; // right edge of source card
@@ -12,7 +12,8 @@ interface ConnectorProps {
 export default function BracketConnector({ x1, y1, x2, y2, active }: ConnectorProps) {
   const midX = x1 + (x2 - x1) / 2;
   const color = active ? "#10b981" : "#CBD5E1";
-  const d = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`;
+  // Cubic bezier S-curve: control points at midX keep the horizontal exit/entry
+  const d = `M ${x1} ${y1} C ${midX} ${y1} ${midX} ${y2} ${x2} ${y2}`;
   return (
     <path
       d={d}

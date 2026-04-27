@@ -8,9 +8,10 @@ interface MatchCardProps {
   isAdmin: boolean;
   onClick?: () => void;
   highlight?: boolean;
+  compact?: boolean;
 }
 
-export default function MatchCard({ match, isAdmin, onClick, highlight }: MatchCardProps) {
+export default function MatchCard({ match, isAdmin, onClick, highlight, compact }: MatchCardProps) {
   const scores: SetScore[] = match.scores ? JSON.parse(match.scores) : [];
   const team1Sets = scores.filter((s) => s.team1 > s.team2).length;
   const team2Sets = scores.filter((s) => s.team2 > s.team1).length;
@@ -52,7 +53,7 @@ export default function MatchCard({ match, isAdmin, onClick, highlight }: MatchC
       >
         <span
           className={cn(
-            "truncate max-w-[170px]",
+            compact ? "truncate flex-1 min-w-0" : "truncate max-w-[170px]",
             isWinner ? "font-bold text-emerald-700 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300",
             !name && "text-slate-300 dark:text-slate-600 italic"
           )}
@@ -88,7 +89,8 @@ export default function MatchCard({ match, isAdmin, onClick, highlight }: MatchC
   return (
     <div
       className={cn(
-        "w-[260px] rounded-lg border-2 overflow-hidden transition-all select-none",
+        compact ? "w-full" : "w-[260px]",
+        "rounded-lg border-2 overflow-hidden transition-all select-none",
         highlight ? "border-yellow-400 shadow-yellow-200 shadow-md dark:border-yellow-500 dark:shadow-yellow-900/50" : statusBg,
         canEdit && "cursor-pointer hover:border-emerald-400 hover:shadow-md active:scale-95"
       )}

@@ -35,12 +35,12 @@ export default function Modal({ open, onClose, title, children, className }: Mod
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div
         className={cn(
-          "relative z-10 w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900",
+          "relative z-10 w-full max-w-lg max-h-[90vh] flex flex-col rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900",
           className
         )}
       >
         {title && (
-          <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-700">
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-700">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               {title}
             </h2>
@@ -54,7 +54,7 @@ export default function Modal({ open, onClose, title, children, className }: Mod
             </button>
           </div>
         )}
-        <div className="p-6">{children}</div>
+        <div className="flex-1 overflow-y-auto p-6">{children}</div>
       </div>
     </div>
   );

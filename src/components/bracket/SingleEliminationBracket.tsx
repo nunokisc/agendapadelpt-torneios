@@ -202,6 +202,7 @@ export default function SingleEliminationBracket({ matches, isAdmin, onMatchClic
                 isAdmin={isAdmin}
                 onClick={() => onMatchClick(m)}
                 highlight={winnerPathIds.has(m.id)}
+                compact
               />
             </div>
           ))}
