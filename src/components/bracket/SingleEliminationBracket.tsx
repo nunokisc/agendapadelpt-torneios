@@ -6,10 +6,11 @@ import BracketConnector from "./BracketConnector";
 import type { Match } from "@/types";
 
 // Layout constants — CARD_W must match MatchCard's w-[260px]
+// CARD_H must be >= max card rendered height (2 player rows + schedule row ≈ 91px)
 const CARD_W = 260;
-const CARD_H = 72;
+const CARD_H = 96;
 const COL_GAP = 48; // horizontal gap between rounds
-const ROW_GAP = 12; // vertical gap between cards in same round
+const ROW_GAP = 16; // vertical gap between cards in same round
 
 interface Props {
   matches: Match[];
@@ -93,7 +94,7 @@ export default function SingleEliminationBracket({ matches, isAdmin, onMatchClic
     // Third place match — below the final column
     for (const m of thirdPlace) {
       const finalY = (byRound.get(maxRound)?.[0] ? getCenter(byRound.get(maxRound)![0]) : 0);
-      positions[m.id] = { x: colX(maxRound), y: finalY + CARD_H + 40 };
+      positions[m.id] = { x: colX(maxRound), y: finalY + CARD_H + 52 };
     }
 
     // SVG connector lines
@@ -223,14 +224,7 @@ export default function SingleEliminationBracket({ matches, isAdmin, onMatchClic
             {getRoundName(r, maxRound)}
           </div>
         ))}
-        {thirdPlace.length > 0 && (
-          <div
-            className="text-xs font-semibold text-amber-500 uppercase tracking-wide text-center"
-            style={{ width: CARD_W, marginLeft: COL_GAP }}
-          >
-            3.º / 4.º lugar
-          </div>
-        )}
+        {/* No extra column for 3rd-place — card is in the Final column, label renders inline above the card */}
       </div>
 
       {/* SVG + match cards */}
@@ -245,6 +239,21 @@ export default function SingleEliminationBracket({ matches, isAdmin, onMatchClic
             <BracketConnector key={key} {...rest} />
           ))}
         </svg>
+
+        {/* 3rd-place label — rendered above its card, inside the Final column */}
+        {thirdPlace.map((m) => {
+          const pos = positions[m.id];
+          if (!pos) return null;
+          return (
+            <div
+              key={`3rd-label-${m.id}`}
+              className="absolute text-xs font-semibold text-amber-500 uppercase tracking-wide text-center"
+              style={{ left: pos.x, top: pos.y - 24, width: CARD_W }}
+            >
+              3.º / 4.º Lugar
+            </div>
+          );
+        })}
 
         {/* Match cards */}
         {allVisible.map((m) => {
