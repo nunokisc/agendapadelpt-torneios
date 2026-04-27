@@ -1,4 +1,4 @@
-const CACHE = "padel-v2";
+const CACHE = "padel-v3";
 const PRECACHE = ["/", "/torneios"];
 
 self.addEventListener("install", (e) => {
@@ -19,11 +19,31 @@ self.addEventListener("fetch", (e) => {
   const { request } = e;
   const url = new URL(request.url);
 
+  // Only handle http/https — chrome-extension:// and other schemes must be ignored
+  if (!url.protocol.startsWith("http")) return;
+
   // Skip non-GET requests
   if (request.method !== "GET") return;
 
   // SSE streams should not be cached
   if (url.pathname.includes("/stream")) return;
+
+  // Navigation requests (HTML pages) — always network-first to avoid serving stale
+  // HTML after a new deploy (old HTML references old content-hash chunk filenames → 404)
+  if (request.mode === "navigate") {
+    e.respondWith(
+      fetch(request)
+        .then((res) => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then((c) => c.put(request, clone));
+          }
+          return res;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
 
   // Network-first for API calls — cache successful responses as offline fallback
   if (url.pathname.startsWith("/api/")) {
