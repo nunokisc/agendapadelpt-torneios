@@ -1,4 +1,97 @@
-const CACHE = "padel-v4";
+// ─── Cache version ────────────────────────────────────────────────────────────
+// Bump this on every deploy that changes caching strategy.
+// Keep the name in sync with the version so old caches are evicted on activate.
+const CACHE = "padel-v5";
+
+// ─── Install ───────────────────────────────────────────────────────────────────
+// No HTML precaching — HTML bakes in content-hash chunk filenames that go stale
+// after every deploy. Only cache things that are truly static.
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
+// ─── Activate ──────────────────────────────────────────────────────────────────
+self.addEventListener("activate", (e) => {
+  e.waitUntil(
+    caches.keys()
+      .then((keys) =>
+        // Delete every cache that isn't the current one
+        Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      )
+      .then(() => self.clients.claim())
+      .then(() =>
+        // Navigate all controlled windows to their current URL so they load fresh
+        // HTML from the network. Works even on old pages with no controllerchange
+        // listener — the SW forces the reload itself.
+        self.clients.matchAll({ type: "window", includeUncontrolled: false })
+          .then((clients) => Promise.all(clients.map((c) => c.navigate(c.url))))
+      )
+  );
+});
+
+// ─── Fetch ─────────────────────────────────────────────────────────────────────
+self.addEventListener("fetch", (e) => {
+  const { request } = e;
+  const url = new URL(request.url);
+
+  // Ignore non-HTTP schemes (chrome-extension://, etc.)
+  if (!url.protocol.startsWith("http")) return;
+
+  // Only intercept GET
+  if (request.method !== "GET") return;
+
+  // Never intercept SSE
+  if (url.pathname.includes("/stream")) return;
+
+  // ── HTML navigation — always network-only ────────────────────────────────────
+  // HTML is NEVER cached because it contains content-hash chunk filenames that
+  // become stale the moment a new build is deployed.
+  if (request.mode === "navigate") {
+    e.respondWith(fetch(request));
+    return;
+  }
+
+  // ── Next.js static assets — cache-first, immutable ──────────────────────────
+  // These URLs contain their own content hash so they are safe to cache forever.
+  // A new deploy produces new URLs; old ones are simply never requested again.
+  if (url.pathname.startsWith("/_next/static/")) {
+    e.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((res) => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then((c) => c.put(request, clone));
+          }
+          return res;
+        });
+      })
+    );
+    return;
+  }
+
+  // ── API calls — network-first, cache as offline fallback ─────────────────────
+  if (url.pathname.startsWith("/api/")) {
+    e.respondWith(
+      fetch(request)
+        .then((res) => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then((c) => c.put(request, clone));
+          }
+          return res;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // ── Everything else — network only (no caching) ───────────────────────────────
+  // Public assets (icons, manifest, sw.js itself) are handled by nginx/Cloudflare
+  // caching and don't need SW caching.
+});
+
+// ── Push Notifications ──────────────────────────────────────────────────────
 const PRECACHE = ["/", "/torneios"];
 
 self.addEventListener("install", (e) => {
