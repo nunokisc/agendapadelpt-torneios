@@ -17,6 +17,34 @@ Plataforma web para criação e gestão de torneios de padel (duplas). Suporta m
 
 ## Funcionalidades
 
+### Séries / Categorias
+
+Um torneio pode ter **uma ou múltiplas séries** (ex: M3, M4, F3, MX3). Cada série é gerida de forma independente — jogadores, bracket e estado próprios.
+
+**Modos de torneio:**
+
+| Modo | Descrição |
+|------|-----------|
+| **Manual** | O organizador escolhe um formato de jogo único aplicado a todas as séries |
+| **FPP Automático** | Formato e sistema de cada série determinados automaticamente pela tabela FPP, com base no número de duplas confirmadas |
+
+**Ciclo de vida de uma série:** `draft` → `in_progress` (após gerar o bracket) → `completed` (todos os jogos terminados). O estado do torneio reflecte o agregado de todas as séries.
+
+**Séries disponíveis (FPP):**
+
+| Grupo | Códigos |
+|-------|---------|
+| Masculino | M1, M2, M3, M4, M5, M6 |
+| Feminino | F1, F2, F3, F4, F5, F6 |
+| Misto | MX1, MX2, MX3, MX4, MX5, MX6 |
+| Veteranos Masc. | +35M, +40M, +45M, +50M, +55M, +60M |
+| Veteranas Fem. | +35F, +40F, +45F, +50F, +55F, +60F |
+| Sub | SUB18, SUB14, SUB12 |
+
+Torneios sem séries explícitas usam uma série interna `OPEN` (retrocompatibilidade total).
+
+---
+
 ### Formatos de torneio
 
 | Formato | Descrição |
@@ -105,15 +133,17 @@ Critérios de desempate (por ordem):
 ### Gestão de torneios (admin)
 - **Editar** — nome, descrição, número de campos, torneio público, inscrições abertas
 - **Eliminar** — apaga torneio e todos os dados associados
-- **Clonar** — cria novo rascunho com as mesmas duplas e configurações
+- **Clonar** — cria novo rascunho com as mesmas duplas, séries e configurações (mapeamento de categoryId preservado)
+- **Gerir Categorias** — adicionar ou remover séries em qualquer torneio (série só pode ser removida se ainda em rascunho e existir pelo menos uma outra)
 - Separador **Agenda** — definir campo e hora por jogo ou agendar automaticamente todos os jogos distribuídos pelos campos disponíveis
 - Botão **WhatsApp** por jogo agendado — abre o WhatsApp com mensagem pré-formatada (nomes das duplas, data/hora, campo, nome do torneio) para partilhar num grupo
-- Separador **Inscrições** — aprovar ou rejeitar inscrições pendentes de duplas
+- Separador **Inscrições** — aprovar ou rejeitar inscrições pendentes de duplas; em torneios multi-série o admin pode mudar a série antes de aprovar
 
 ### Auto-inscrição pública
 - Página pública `/tournament/[slug]/register` para duplas se inscreverem
 - Formulário: Jogador 1, Jogador 2, nome de dupla (opcional), contacto (opcional)
-- Inscrições ficam pendentes até o admin aprovar (cria dupla) ou rejeitar
+- Em torneios com múltiplas séries: dropdown obrigatório para escolher a série
+- Inscrições ficam pendentes até o admin aprovar (cria dupla na série correspondente) ou rejeitar
 - Activado por `registrationOpen` no torneio
 
 ### Agenda e campos
@@ -154,6 +184,7 @@ Critérios de desempate (por ordem):
 
 ### Vista de bracket em ecrã completo
 - `/tournament/[slug]/bracket` — bracket sem navegação
+- Em torneios multi-série: tabs por série, com persistência em `?cat=<código>`
 - Botão **Imprimir** com CSS de impressão (oculta nav, mostra cabeçalho limpo)
 - Destaque do caminho do vencedor
 
@@ -273,23 +304,27 @@ src/
 │   │   ├── admin/route.ts                # GET /api/admin (token plataforma)
 │   │   ├── tournaments/route.ts          # GET /api/tournaments (públicos)
 │   │   └── tournament/
-│   │       ├── route.ts                  # POST /api/tournament (criar)
+│   │       ├── route.ts                  # POST /api/tournament (criar; suporta tournamentMode + categories)
 │   │       └── [slug]/
-│   │           ├── route.ts              # GET / PATCH / DELETE torneio
-│   │           ├── generate/route.ts     # POST gerar bracket (filtra checkedIn; suporta fpp_auto)
-│   │           ├── players/route.ts      # POST/PUT/PATCH/DELETE duplas + check-in
-│   │           ├── match/[matchId]/      # PUT introduzir resultado; gera knockout ao terminar grupos
-│   │           ├── clone/route.ts        # POST clonar torneio
-│   │           ├── register/route.ts     # GET/POST/PATCH inscrições
+│   │           ├── route.ts              # GET (inclui categories com players+matches) / PATCH / DELETE
+│   │           ├── categories/
+│   │           │   ├── route.ts          # GET listar séries; POST adicionar série por código
+│   │           │   └── [categoryId]/route.ts  # PUT actualizar; DELETE remover série
+│   │           ├── generate/route.ts     # POST gerar bracket por categoryId; fpp_auto auto-determina formato
+│   │           ├── players/route.ts      # POST/PUT/PATCH/DELETE duplas + check-in (aceita categoryId)
+│   │           ├── match/[matchId]/      # PUT resultado; avança grupos e sets category.status
+│   │           ├── clone/route.ts        # POST clonar (remapeia categoryIds)
+│   │           ├── register/route.ts     # GET/POST/PATCH inscrições (aceita categoryId)
+│   │           ├── reset/route.ts        # POST repor bracket (opcional: só uma categoria)
 │   │           ├── schedule/route.ts     # PATCH/POST agenda de jogos
 │   │           ├── export/route.ts       # GET exportar CSV / iCal
 │   │           └── stream/route.ts       # GET SSE para live updates
 │   └── tournament/[slug]/
-│       ├── page.tsx                      # Vista principal (tabs + bottom nav mobile)
-│       ├── bracket/page.tsx              # Ecrã completo + imprimir
+│       ├── page.tsx                      # Vista principal (tabs por série; FPP confirm dialog)
+│       ├── bracket/page.tsx              # Ecrã completo + tabs por série (?cat=) + imprimir
 │       ├── minha-dupla/page.tsx          # "Os meus jogos" — pesquisa por nome
 │       ├── stats/page.tsx                # Estatísticas por dupla
-│       └── register/page.tsx             # Inscrição pública de dupla
+│       └── register/page.tsx             # Inscrição pública (dropdown de série se multi-série)
 ├── components/
 │   ├── bracket/
 │   │   ├── MatchCard.tsx                 # Cartão de jogo (destaque vencedor)
@@ -299,14 +334,14 @@ src/
 │   │   ├── GroupStageView.tsx            # Grupos com tabs mobile
 │   │   └── BracketConnector.tsx          # Linhas SVG entre jogos
 │   ├── tournament/
-│   │   ├── CreateTournamentForm.tsx      # Selector agrupado FPP/FFT; starPoint; fpp_auto
-│   │   ├── PlayerList.tsx                # Duplas: drag & drop, bulk import, check-in
+│   │   ├── CreateTournamentForm.tsx      # Toggle Manual/FPP Auto; selector séries; FPPAutoInfo
+│   │   ├── PlayerList.tsx                # Duplas: drag & drop, bulk import, check-in (passa categoryId)
 │   │   ├── MyTournaments.tsx             # Painel localStorage
 │   │   ├── ScoreInputModal.tsx           # Introdução de resultados com +/− buttons
 │   │   ├── TournamentHeader.tsx          # Editar / Eliminar / Clonar
 │   │   ├── LinkShare.tsx                 # Partilhar link + QR code
 │   │   ├── ScheduleManager.tsx           # Agenda de jogos + WhatsApp notification
-│   │   └── RegistrationPanel.tsx         # Aprovar/rejeitar inscrições
+│   │   └── RegistrationPanel.tsx         # Aprovar/rejeitar; filtro por série; mudar série
 │   └── layout/
 │       ├── Header.tsx
 │       ├── Footer.tsx
@@ -315,11 +350,13 @@ src/
 ├── lib/
 │   ├── bracket-engine.ts                 # generateSingleElimination / RR / Groups / DE
 │   ├── fpp-bracket.ts                    # getFPPConfig (sistema por nº duplas) + fppKnockoutOrder
+│   ├── fpp-format.ts                     # getFppFormatForCategory — determina matchFormat + systemType (FPP Auto)
+│   ├── categories.ts                     # FPP_CATEGORIES (34 séries); getCategoryName
 │   ├── scoring.ts                        # Formatos FPP + FFT; determineSetWinner; validateScores
 │   ├── standings.ts                      # computeGroupStandings (5 critérios de desempate)
 │   ├── bulk-import.ts                    # parseBulkText — parser de importação em massa
 │   ├── my-tournaments.ts                 # localStorage helpers
-│   ├── validators.ts                     # Zod schemas (todos os formatos FPP+FFT; starPoint)
+│   ├── validators.ts                     # Zod schemas (tournamentMode; categories)
 │   └── db.ts / slug.ts / utils.ts / seeding.ts / round-robin.ts
 ├── __tests__/
 │   ├── scoring.test.ts                   # 70+ testes de scoring por formato (FFT + FPP)
@@ -327,7 +364,7 @@ src/
 │   ├── standings.test.ts                 # Testes de classificação com h2h
 │   ├── bulk-import.test.ts               # Testes do parser de importação em massa
 │   └── fpp-bracket.test.ts               # Testes de getFPPConfig e fppKnockoutOrder
-└── types/index.ts                        # Tournament, Player, Match, Registration, MatchFormat
+└── types/index.ts                        # Tournament, Player, Match, Registration, Category, MatchFormat
 
 prisma/
 ├── schema.prisma                         # patchado pelo db:setup (provider varia)
@@ -339,7 +376,8 @@ prisma/
     ├── 20260424_doubles/
     ├── 20260424_features/
     ├── 20260425_checkin/
-    └── 20260426_starpoint/
+    ├── 20260426_starpoint/
+    └── 20260427_categories/              # Adiciona Category; tournamentMode; categoryId em Player/Match/Registration
 
 scripts/
 ├── setup-db.mjs                          # Cria/actualiza DB e aplica migrations (idempotente)
@@ -356,28 +394,47 @@ public/
 
 ```prisma
 model Tournament {
-  slug             String   @unique
-  adminToken       String   @unique
-  format           String   // single_elimination | double_elimination | round_robin
-                            // | groups_knockout | fpp_auto
-  matchFormat      String   @default("M3SPO")  // código FPP ou FFT (ver tabela de formatos)
-  starPoint        Boolean  @default(false)     // Star Point FIP 2026 (ponto de ouro a 40-40)
-  status           String   @default("draft")  // draft | in_progress | completed
-  thirdPlace       Boolean  @default(false)
-  groupCount       Int?     // nº de grupos; para fpp_auto é preenchido ao gerar
-  advanceCount     Int?     // duplas que avançam por grupo
-  isPublic         Boolean  @default(false)
-  registrationOpen Boolean  @default(false)
+  slug             String     @unique
+  adminToken       String     @unique
+  format           String     // single_elimination | double_elimination | round_robin
+                              // | groups_knockout | fpp_auto
+  tournamentMode   String     @default("manual")  // manual | fpp_auto
+  matchFormat      String     @default("M3SPO")   // código FPP ou FFT (ver tabela de formatos)
+  starPoint        Boolean    @default(false)      // Star Point FIP 2026 (ponto de ouro a 40-40)
+  status           String     @default("draft")   // draft | in_progress | completed
+  thirdPlace       Boolean    @default(false)
+  groupCount       Int?       // retrocompatibilidade (single-category)
+  advanceCount     Int?
+  isPublic         Boolean    @default(false)
+  registrationOpen Boolean    @default(false)
   courtCount       Int?
+  categories       Category[]
+}
+
+model Category {
+  id           String    // código único por torneio (ex: M3, F4, OPEN)
+  tournamentId String
+  code         String    // código de exibição
+  name         String    // nome completo
+  matchFormat  String?   // override de formato (null = herda do torneio)
+  starPoint    Boolean   @default(false)
+  format       String?   // sistema de bracket (preenchido ao gerar)
+  groupCount   Int?
+  advanceCount Int?
+  status       String    @default("draft")  // draft | in_progress | completed
+  order        Int       @default(0)
+  players      Player[]
+  matches      Match[]
 }
 
 model Player {              // representa uma dupla
   name         String      // nome de exibição: teamName ou "J1 / J2"
-  player1Name  String      // nome do primeiro jogador
-  player2Name  String      // nome do segundo jogador
+  player1Name  String
+  player2Name  String
   seed         Int?
-  checkedIn    Boolean     @default(true)   // só entra no bracket se true
+  checkedIn    Boolean     @default(true)
   groupIndex   Int?
+  categoryId   String?     // null → série OPEN (retrocompatibilidade)
 }
 
 model Match {
@@ -388,12 +445,13 @@ model Match {
   team1Id          String?
   team2Id          String?
   winnerId         String?
-  scores           String?   // JSON: SetScore[] — ex: [{"team1":6,"team2":4},{"team1":7,"team2":6,"tiebreak":{"team1":7,"team2":3}}]
+  scores           String?   // JSON: SetScore[]
   scheduledAt      DateTime?
   court            String?
   status           String    // pending | in_progress | completed | bye
   nextMatchId      String?
   loserNextMatchId String?
+  categoryId       String?
 }
 
 model Registration {
@@ -403,6 +461,7 @@ model Registration {
   teamName     String?
   contact      String?
   status       String  @default("pending") // pending | approved | rejected
+  categoryId   String?
 }
 ```
 
@@ -443,7 +502,13 @@ Painel global: `/admin?token=padel-admin-2025`
 
 **Formato FPP automático (`fpp_auto`)**: o formato é apenas uma etiqueta guardada no torneio. O sistema de grupos (1, 2 ou 3 grupos, ou eliminação directa) é determinado em `src/lib/fpp-bracket.ts → getFPPConfig(playerCount)` **no momento de gerar o bracket**, quando o número de duplas confirmadas é conhecido. O seeding cross-grupo (`fppKnockoutOrder`) garante que nenhum par do mesmo grupo se cruza na primeira ronda do knockout.
 
+**Modo FPP Automático (`tournamentMode = "fpp_auto"`)**: distinto do campo `format`. Quando `tournamentMode` é `"fpp_auto"`, a geração do bracket usa `getFppFormatForCategory(n)` (`src/lib/fpp-format.ts`) para determinar simultaneamente o **matchFormat** (ex: M3SPO, PROPO) e o **sistema de bracket** (round_robin, groups_knockout, single_elimination) com base na tabela FPP. Esta função é diferente de `getFPPConfig` que apenas determina o sistema de bracket para o campo `format = "fpp_auto"` (modo legado).
+
 **Geração do bracket de Grupos+Knockout**: quando o último jogo de grupo é registado, o servidor computa automaticamente as classificações e gera o bracket de eliminação dentro da mesma transacção Prisma. Para `fpp_auto` usa `fppKnockoutOrder`; para `groups_knockout` manual usa o seeding legacy.
+
+**Séries/Categorias**: cada série tem os seus próprios `Player[]` e `Match[]`. A geração do bracket aceita `categoryId` no body e actua apenas sobre essa série. O `category.status` transita para `in_progress` ao gerar e para `completed` quando todos os jogos da série terminam. O `tournament.status` só passa a `completed` quando todas as séries estão concluídas. Torneios existentes sem séries têm uma categoria `OPEN` criada pela migração `20260427_categories` — todo o código legado continua a funcionar sem alterações.
+
+**Clone com séries**: o clone remapeia os `categoryId` de todos os jogadores para os IDs das novas categorias clonadas, usando um mapa `oldId → newId` construído durante a transacção.
 
 **SSR e localStorage**: componentes que dependem de `localStorage` usam um estado `ready` inicializado a `false` para evitar hydration mismatch.
 
