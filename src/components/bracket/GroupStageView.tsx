@@ -88,7 +88,7 @@ export default function GroupStageView({ matches, players, isAdmin, onMatchClick
         )}
       </div>
 
-      {/* ── Desktop: full grid ── */}}
+      {/* ── Desktop: full grid ── */}
       <div className="hidden sm:block space-y-8">
         <div>
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4">Fase de Grupos</h3>
