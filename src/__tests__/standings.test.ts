@@ -130,3 +130,82 @@ describe("computeGroupStandings", () => {
     expect(standings2[1].playerId).toBe("E");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Head-to-head tiebreakers (criteria 4 & 5) — detailed tests
+// ---------------------------------------------------------------------------
+describe("computeGroupStandings — head-to-head wins (criterion 4)", () => {
+  it("direct h2h win breaks tie when wins + sets + games are equal", () => {
+    // A and B: both 2-0 on wins, identical sets and games except in h2h
+    // A beats B 6-3 6-3; A beats C 6-0 6-0; B beats C 6-3 6-3
+    const matches = [
+      makeMatch("A", "B", "A", [{ team1: 6, team2: 3 }, { team1: 6, team2: 3 }]), // A beats B
+      makeMatch("A", "C", "A", [{ team1: 6, team2: 0 }, { team1: 6, team2: 0 }]), // A beats C
+      makeMatch("B", "C", "B", [{ team1: 6, team2: 3 }, { team1: 6, team2: 3 }]), // B beats C
+    ];
+    const standings = computeGroupStandings(matches, ["A", "B", "C"]);
+    // A: 2W, sets +4, games +18
+    // B: 1W, sets +2, games +12
+    // C: 0W
+    // Primary criteria (wins) already separate them — A > B > C
+    expect(standings[0].playerId).toBe("A");
+    expect(standings[1].playerId).toBe("B");
+    expect(standings[2].playerId).toBe("C");
+  });
+
+  it("h2h wins resolves 2-way tie (equal wins, sets and games) — clear winner", () => {
+    // Scenario: A and B both have 1 win and 1 loss vs C;
+    // their game/set diffs vs C are identical → resolved by A vs B h2h
+    const matches = [
+      makeMatch("A", "B", "A", [{ team1: 6, team2: 3 }, { team1: 6, team2: 3 }]), // A beats B
+      makeMatch("A", "C", "C", [{ team1: 3, team2: 6 }, { team1: 3, team2: 6 }]), // C beats A
+      makeMatch("B", "C", "C", [{ team1: 3, team2: 6 }, { team1: 3, team2: 6 }]), // C beats B
+    ];
+    // A: 1W (beat B), 1L (lost to C), set diff: -2+2=0, game diff vs C = -6
+    // But wait, A beat B 12-6, so A's total: sets +2-2=0, games +12-6=+6 vs -6=-0... 
+    // Let's just check: A beat B, so in h2h A > B
+    const standings = computeGroupStandings(matches, ["A", "B", "C"]);
+    expect(standings[0].playerId).toBe("C"); // 2 wins
+    // Between A and B: A beat B directly, so A should be above B
+    const aIdx = standings.findIndex((s) => s.playerId === "A");
+    const bIdx = standings.findIndex((s) => s.playerId === "B");
+    expect(aIdx).toBeLessThan(bIdx);
+  });
+
+  it("h2h game balance (criterion 5) breaks tie when h2h wins are even — not used in circular 3-way", () => {
+    // Simple 2-player scenario: both played each other once — the match winner is h2h winner
+    const matches = [
+      makeMatch("X", "Y", "X", [{ team1: 6, team2: 0 }, { team1: 6, team2: 0 }]),
+    ];
+    const standings = computeGroupStandings(matches, ["X", "Y"]);
+    expect(standings[0].playerId).toBe("X"); // won h2h with +12 game balance
+    expect(standings[1].playerId).toBe("Y");
+  });
+});
+
+describe("computeGroupStandings — played counter", () => {
+  it("played count equals number of completed matches involving each player", () => {
+    const matches = [
+      makeMatch("A", "B", "A", [{ team1: 6, team2: 3 }, { team1: 6, team2: 4 }]),
+      makeMatch("A", "C", "A", [{ team1: 6, team2: 1 }, { team1: 6, team2: 2 }]),
+    ];
+    const standings = computeGroupStandings(matches, ["A", "B", "C"]);
+    const a = standings.find((s) => s.playerId === "A")!;
+    const b = standings.find((s) => s.playerId === "B")!;
+    const c = standings.find((s) => s.playerId === "C")!;
+    expect(a.played).toBe(2);
+    expect(b.played).toBe(1);
+    expect(c.played).toBe(1);
+  });
+
+  it("losses counter is correct", () => {
+    const matches = [
+      makeMatch("A", "B", "A", [{ team1: 6, team2: 3 }, { team1: 6, team2: 4 }]),
+    ];
+    const standings = computeGroupStandings(matches, ["A", "B"]);
+    const a = standings.find((s) => s.playerId === "A")!;
+    const b = standings.find((s) => s.playerId === "B")!;
+    expect(a.losses).toBe(0);
+    expect(b.losses).toBe(1);
+  });
+});

@@ -118,6 +118,8 @@ Os formatos FPP são aliases dos FFT: PRO≡D1, PROPO≡D2, M3S≡B1, M3SPO≡B2
 - Detecção automática de vencedor de set e de jogo com base na estrutura do formato (sem hardcoding de nomes de formatos)
 - Suporte a tie-breaks e Super Tie-Break com campos dedicados
 - Avanço automático no bracket após cada resultado
+- **Reset de resultado** — um jogo já concluído pode ter o resultado reposto desde que o jogo seguinte no bracket ainda não tenha resultado; confirmação obrigatória no modal
+- **Início de jogo** — botão "Iniciar jogo" regista `startedAt`; ao submeter o resultado, o sistema calcula o atraso relativamente ao slot agendado e empurra automaticamente os jogos seguintes no mesmo campo (_delay-push_)
 
 ### Classificação em grupos (Round Robin / Fase de Grupos)
 
@@ -148,8 +150,10 @@ Critérios de desempate (por ordem):
 
 ### Agenda e campos
 - `courtCount` no torneio define o número de campos disponíveis
-- Auto-agendamento: distribui jogos por ronda pelos campos com duração configurável
-- Cada jogo pode ter campo e hora definidos individualmente
+- **Auto-agendamento** — distribui todos os jogos pelos campos disponíveis com duração configurável e janelas horárias por dia (suporta múltiplos dias); respeita jogos já concluídos ou em curso ao calcular o próximo slot livre por campo
+- `slotMinutes` e `scheduleDays` (JSON) ficam persistidos no torneio após auto-agendamento, permitindo ao _delay-push_ calcular o fim de cada janela diária
+- Cada jogo pode ter campo e hora definidos individualmente via separador Agenda
+- Jogos já concluídos ou em curso não podem ser reagendados (bloqueio na API)
 
 ### "Os meus jogos"
 - Página `/tournament/[slug]/minha-dupla` — pesquisa por nome (mín. 2 letras) e vê todos os jogos da dupla
@@ -259,7 +263,7 @@ npm run dev
 
 # Base de dados
 npm run db:setup    # configura DB (detecta SQLite/MySQL, aplica migrações, gera Prisma client)
-npm run db:seed     # insere os 6 torneios de demonstração
+npm run db:seed     # insere os 8 torneios de demonstração
 npm run db:reset    # apaga e recria a DB (SQLite: apaga ficheiro; MySQL: migrate reset) + seed
 
 # Testes
@@ -359,11 +363,14 @@ src/
 │   ├── validators.ts                     # Zod schemas (tournamentMode; categories)
 │   └── db.ts / slug.ts / utils.ts / seeding.ts / round-robin.ts
 ├── __tests__/
-│   ├── scoring.test.ts                   # 70+ testes de scoring por formato (FFT + FPP)
-│   ├── bracket-engine.test.ts            # Testes de geração de brackets
-│   ├── standings.test.ts                 # Testes de classificação com h2h
+│   ├── scoring.test.ts                   # 100+ testes de scoring por formato (FFT + FPP + aliases + No-Ad)
+│   ├── bracket-engine.test.ts            # Testes de geração de brackets (SE, RR, Grupos, DE)
+│   ├── standings.test.ts                 # Testes de classificação com h2h e contadores
 │   ├── bulk-import.test.ts               # Testes do parser de importação em massa
-│   └── fpp-bracket.test.ts               # Testes de getFPPConfig e fppKnockoutOrder
+│   ├── fpp-bracket.test.ts               # Testes de getFPPConfig e fppKnockoutOrder
+│   ├── fpp-format.test.ts                # Testes de getFppFormatForCategory (tabela FPP Annex XIX)
+│   ├── categories.test.ts                # Testes das 34 séries FPP e getCategoryName
+│   └── validators.test.ts                # Testes dos Zod schemas de validação de input
 └── types/index.ts                        # Tournament, Player, Match, Registration, Category, MatchFormat
 
 prisma/
@@ -377,12 +384,13 @@ prisma/
     ├── 20260424_features/
     ├── 20260425_checkin/
     ├── 20260426_starpoint/
-    └── 20260427_categories/              # Adiciona Category; tournamentMode; categoryId em Player/Match/Registration
+    ├── 20260427_categories/              # Adiciona Category; tournamentMode; categoryId em Player/Match/Registration
+    └── 20260427_schedule/               # Adiciona slotMinutes e scheduleDays ao Tournament; startedAt ao Match
 
 scripts/
 ├── setup-db.mjs                          # Cria/actualiza DB e aplica migrations (idempotente)
 ├── db-reset.mjs                          # Apaga e recria DB + seed
-└── seed-demo.ts                          # 6 torneios de demonstração em todos os formatos
+└── seed-demo.ts                          # 8 torneios de demonstração em todos os formatos e estados
 
 public/
 └── sw.js                                 # Service worker PWA
@@ -408,6 +416,8 @@ model Tournament {
   isPublic         Boolean    @default(false)
   registrationOpen Boolean    @default(false)
   courtCount       Int?
+  slotMinutes      Int?       // minutos por slot (definido pelo auto-agendamento)
+  scheduleDays     String?    // JSON: [{date,startTime,endTime}[]] (janelas de agenda)
   categories       Category[]
 }
 
@@ -448,6 +458,7 @@ model Match {
   scores           String?   // JSON: SetScore[]
   scheduledAt      DateTime?
   court            String?
+  startedAt        DateTime? // preenchido ao clicar "Iniciar jogo"; usado pelo delay-push
   status           String    // pending | in_progress | completed | bye
   nextMatchId      String?
   loserNextMatchId String?
@@ -471,20 +482,26 @@ model Registration {
 
 Após `npm run db:reset`:
 
-| Torneio | URL pública | Token admin |
-|---------|------------|-------------|
-| Rascunho (SE) | `/tournament/demo-rascunho` | `admin-rascunho` |
-| SE em curso | `/tournament/demo-eliminacao` | `admin-eliminacao` |
-| SE concluído | `/tournament/demo-eliminacao-concluido` | `admin-concluido` |
-| Round Robin | `/tournament/demo-roundrobin` | `admin-roundrobin` |
-| Grupos + KO | `/tournament/demo-grupos` | `admin-grupos` |
-| Dupla Eliminação | `/tournament/demo-dupla` | `admin-dupla` |
+| Torneio | URL pública | Token admin | Estado |
+|---------|------------|-------------|--------|
+| Rascunho Multi-série | `/tournament/demo-rascunho-multi` | `admin-rascunho-multi` | Draft, inscrições abertas |
+| FPP Auto em curso | `/tournament/demo-fpp-auto` | `admin-fpp-auto` | Em curso, 2 séries (M3+F3) |
+| SE Concluído | `/tournament/demo-eliminacao-concluido` | `admin-concluido` | Concluído, com vencedor e 3.º lugar |
+| Round Robin | `/tournament/demo-roundrobin` | `admin-roundrobin` | Em curso, 3 de 5 rondas |
+| Grupos + KO | `/tournament/demo-grupos` | `admin-grupos` | Em curso, grupos A+B feitos, C parcial |
+| Dupla Eliminação | `/tournament/demo-dupla` | `admin-dupla` | Em curso, WR1+LR1 feitos |
+| Grupos + KO Concluído | `/tournament/demo-grupos-completo` | `admin-grupos-completo` | Concluído, todos os grupos + SF+Final |
+| Agenda Live | `/tournament/demo-agenda-live` | `admin-agenda-live` | Em curso, QF em jogo (startedAt) |
 
 Painel global: `/admin?token=padel-admin-2025`
 
 ---
 
 ## Notas de implementação
+
+**Delay-push de agenda**: quando um jogo tem `startedAt` registado e demora mais do que `slotMinutes` do torneio, o servidor calcula o atraso em milissegundos ao receber o resultado. Os jogos seguintes no mesmo campo com `scheduledAt > match.scheduledAt` são empurrados pelo mesmo valor de atraso. Se o novo horário ultrapassar o fim da janela diária (`scheduleDays`), o jogo é desagendado (campo e hora removidos) — nunca se agenda além do fim do dia.
+
+**Reset de resultado**: o modal `ScoreInputModal` permite repor o resultado de um jogo concluído com confirmação explícita. A API bloqueia o reset se o jogo seguinte no bracket já tiver resultado (para jogos de knockout e grupo). Para grupos, o reset é adicionalmente bloqueado se já existirem resultados no bracket de knockout.
 
 **Quirk do Prisma + better-sqlite3**: `prisma migrate deploy` não funciona com o adapter better-sqlite3. Para SQLite, o script `db:setup` aplica as migrations directamente via `better-sqlite3` e regista-as em `_prisma_migrations` manualmente. Para MySQL, usa `prisma migrate deploy` normalmente. O script é idempotente: salta migrações já aplicadas e tolera erros de "duplicate column name" / "table already exists" (regista a migração como aplicada).
 

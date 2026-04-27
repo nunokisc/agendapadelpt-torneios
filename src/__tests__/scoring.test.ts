@@ -245,3 +245,138 @@ describe("validateScores — F (4-game no-ad, TB at 3-3)", () => {
   it("4-3 → invalid (not a valid 4-game score)", () =>
     expect(validateScores([{ team1: 4, team2: 3 }], "F").valid).toBe(false));
 });
+
+// ---------------------------------------------------------------------------
+// No-Ad format variants (A2, B2, C2, D2)
+// ---------------------------------------------------------------------------
+
+describe("determineSetWinner — A2 (No-Ad 6-game sets)", () => {
+  const s = getFormatStructure("A2")[0];
+
+  it("6-3 → team 1 wins", () => expect(determineSetWinner({ team1: 6, team2: 3 }, s)).toBe(1));
+  it("3-6 → team 2 wins", () => expect(determineSetWinner({ team1: 3, team2: 6 }, s)).toBe(2));
+  it("7-5 → team 1 wins", () => expect(determineSetWinner({ team1: 7, team2: 5 }, s)).toBe(1));
+  it("6-6 without tiebreak → null", () =>
+    expect(determineSetWinner({ team1: 6, team2: 6 }, s)).toBeNull());
+  it("6-6 with tiebreak 7-2 → team 1 wins", () =>
+    expect(determineSetWinner({ team1: 6, team2: 6, tiebreak: { team1: 7, team2: 2 } }, s)).toBe(1));
+});
+
+describe("determineMatchWinner — A2 (No-Ad best of 3)", () => {
+  it("6-2, 6-3 → team 1 wins", () =>
+    expect(determineMatchWinner([{ team1: 6, team2: 2 }, { team1: 6, team2: 3 }], "A2")).toBe(1));
+
+  it("0-6, 0-6 → team 2 wins (0-2)", () =>
+    expect(determineMatchWinner([{ team1: 0, team2: 6 }, { team1: 0, team2: 6 }], "A2")).toBe(2));
+});
+
+describe("validateScores — A2 (No-Ad)", () => {
+  it("6-3, 6-4 → valid", () =>
+    expect(validateScores([{ team1: 6, team2: 3 }, { team1: 6, team2: 4 }], "A2").valid).toBe(true));
+
+  it("6-0, 0-6, 7-5 → valid (3rd set)", () =>
+    expect(
+      validateScores([{ team1: 6, team2: 0 }, { team1: 0, team2: 6 }, { team1: 7, team2: 5 }], "A2").valid
+    ).toBe(true));
+});
+
+describe("determineSetWinner — B2 / M3SPO (No-Ad 6-game + STB)", () => {
+  const s = getFormatStructure("B2")[0];
+
+  it("6-4 → team 1 wins", () => expect(determineSetWinner({ team1: 6, team2: 4 }, s)).toBe(1));
+  it("6-6 with tiebreak 7-5 → team 1 wins", () =>
+    expect(determineSetWinner({ team1: 6, team2: 6, tiebreak: { team1: 7, team2: 5 } }, s)).toBe(1));
+});
+
+describe("determineMatchWinner — B2 / M3SPO", () => {
+  it("6-3, 6-4 → team 1 wins", () =>
+    expect(determineMatchWinner([{ team1: 6, team2: 3 }, { team1: 6, team2: 4 }], "B2")).toBe(1));
+
+  it("3-6, 6-3, 10-8 STB → team 1 wins via super tie-break", () =>
+    expect(
+      determineMatchWinner([{ team1: 3, team2: 6 }, { team1: 6, team2: 3 }, { team1: 10, team2: 8 }], "B2")
+    ).toBe(1));
+});
+
+describe("determineMatchWinner — M3SPO (FPP alias for B2)", () => {
+  it("behaves identically to B2: 6-3, 6-4 → team 1", () =>
+    expect(determineMatchWinner([{ team1: 6, team2: 3 }, { team1: 6, team2: 4 }], "M3SPO")).toBe(1));
+});
+
+describe("determineSetWinner — C2 (No-Ad 4-game sets)", () => {
+  const s = getFormatStructure("C2")[0];
+
+  it("4-1 → team 1 wins", () => expect(determineSetWinner({ team1: 4, team2: 1 }, s)).toBe(1));
+  it("1-4 → team 2 wins", () => expect(determineSetWinner({ team1: 1, team2: 4 }, s)).toBe(2));
+  it("4-4 without tiebreak → null", () =>
+    expect(determineSetWinner({ team1: 4, team2: 4 }, s)).toBeNull());
+  it("4-4 with tiebreak 7-5 → team 1 wins", () =>
+    expect(determineSetWinner({ team1: 4, team2: 4, tiebreak: { team1: 7, team2: 5 } }, s)).toBe(1));
+});
+
+describe("determineMatchWinner — C2 (No-Ad 4-game sets + STB)", () => {
+  it("4-2, 4-3 → null (4-3 not valid C2 score)", () =>
+    expect(determineMatchWinner([{ team1: 4, team2: 2 }, { team1: 4, team2: 3 }], "C2")).toBeNull());
+
+  it("4-1, 4-2 → team 1 wins", () =>
+    expect(determineMatchWinner([{ team1: 4, team2: 1 }, { team1: 4, team2: 2 }], "C2")).toBe(1));
+});
+
+describe("determineSetWinner — D2 / PROPO (No-Ad 9-game set)", () => {
+  const s = getFormatStructure("D2")[0];
+
+  it("9-4 → team 1 wins", () => expect(determineSetWinner({ team1: 9, team2: 4 }, s)).toBe(1));
+  it("4-9 → team 2 wins", () => expect(determineSetWinner({ team1: 4, team2: 9 }, s)).toBe(2));
+  it("8-8 with tiebreak 7-3 → team 1 wins", () =>
+    expect(determineSetWinner({ team1: 8, team2: 8, tiebreak: { team1: 7, team2: 3 } }, s)).toBe(1));
+});
+
+describe("determineMatchWinner — D2 / PROPO (FPP alias for D2)", () => {
+  it("9-5 → team 1 wins", () =>
+    expect(determineMatchWinner([{ team1: 9, team2: 5 }], "D2")).toBe(1));
+
+  it("PROPO alias: 9-5 → team 1 wins", () =>
+    expect(determineMatchWinner([{ team1: 9, team2: 5 }], "PROPO")).toBe(1));
+});
+
+// ---------------------------------------------------------------------------
+// FPP aliases (M3S, M3, M3PO, PRO)
+// ---------------------------------------------------------------------------
+
+describe("FPP alias — M3S (= B1: 2 sets + STB)", () => {
+  it("6-3, 6-4 → team 1 wins", () =>
+    expect(determineMatchWinner([{ team1: 6, team2: 3 }, { team1: 6, team2: 4 }], "M3S")).toBe(1));
+
+  it("delegates to B1 structure (normal 6-game sets)", () => {
+    const b1 = getFormatStructure("B1");
+    const m3s = getFormatStructure("M3S");
+    expect(m3s).toEqual(b1);
+  });
+});
+
+describe("FPP alias — M3 (= A1: best of 3)", () => {
+  it("6-0, 6-0 → team 1 wins", () =>
+    expect(determineMatchWinner([{ team1: 6, team2: 0 }, { team1: 6, team2: 0 }], "M3")).toBe(1));
+
+  it("delegates to A1 structure", () => {
+    expect(getFormatStructure("M3")).toEqual(getFormatStructure("A1"));
+  });
+});
+
+describe("FPP alias — M3PO (= A2: No-Ad best of 3)", () => {
+  it("6-3, 6-4 → team 1 wins", () =>
+    expect(determineMatchWinner([{ team1: 6, team2: 3 }, { team1: 6, team2: 4 }], "M3PO")).toBe(1));
+
+  it("delegates to A2 structure", () => {
+    expect(getFormatStructure("M3PO")).toEqual(getFormatStructure("A2"));
+  });
+});
+
+describe("FPP alias — PRO (= D1: 9-game set)", () => {
+  it("9-2 → team 1 wins", () =>
+    expect(determineMatchWinner([{ team1: 9, team2: 2 }], "PRO")).toBe(1));
+
+  it("delegates to D1 structure", () => {
+    expect(getFormatStructure("PRO")).toEqual(getFormatStructure("D1"));
+  });
+});

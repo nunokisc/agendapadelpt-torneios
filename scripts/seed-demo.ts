@@ -2,7 +2,7 @@
  * Seed script for visual demo data.
  * Run with: npx tsx scripts/seed-demo.ts
  *
- * Creates 6 tournaments showcasing all current features:
+ * Creates 8 tournaments showcasing all current features:
  *
  *   1. /tournament/demo-rascunho-multi?token=admin-rascunho-multi
  *      Draft multi-série FPP (M4 + F4 + +40M), inscrições abertas, check-in parcial
@@ -13,9 +13,13 @@
  *   4. /tournament/demo-roundrobin?token=admin-roundrobin
  *      Round Robin 6 duplas, M3SPO com tiebreaks, 3 rondas completas
  *   5. /tournament/demo-grupos?token=admin-grupos
- *      Grupos + Knockout 9 duplas (3 grupos de 3), M3S, grupos A+B completos
+ *      Grupos + Knockout 9 duplas (3 grupos de 3), M3S, grupos A+B completos, C em curso
  *   6. /tournament/demo-dupla?token=admin-dupla
  *      Dupla eliminação 8 duplas, B2 + Star Point, WR1+LR1 concluídos
+ *   7. /tournament/demo-grupos-completo?token=admin-grupos-completo
+ *      Grupos + Knockout 9 duplas — todos os grupos terminados, knockout SF+Final concluídos
+ *   8. /tournament/demo-agenda-live?token=admin-agenda-live
+ *      SE 8 duplas com auto-agenda configurada, 1 jogo em curso (startedAt)
  */
 
 import path from "path";
@@ -43,6 +47,8 @@ const DEMO_SLUGS = [
   "demo-roundrobin",
   "demo-grupos",
   "demo-dupla",
+  "demo-grupos-completo",
+  "demo-agenda-live",
   // Slugs legados (seed anterior) — também removidos ao correr o script
   "demo-rascunho",
   "demo-eliminacao",
@@ -819,6 +825,312 @@ async function seedDoubleElimination() {
   console.log("✓ Demo Dupla Eliminação → /tournament/demo-dupla?token=admin-dupla");
 }
 
+// ─── 7. Grupos + Knockout — CONCLUÍDO com vencedor ───────────────────────────
+//
+// 9 duplas em 3 grupos de 3 (M3S). Todos os grupos terminados.
+// Knockout gerado automaticamente: SF + Final concluídos. Campeão coroado.
+//
+// serpentine(9,3): G.A→[p0,p5,p6], G.B→[p1,p4,p7], G.C→[p2,p3,p8]
+//
+// Standings após todos os grupos:
+//   G.A: 1.º p5 (2V), 2.º p0 (1V), 3.º p6 (0V)
+//   G.B: 1.º p4 (2V), 2.º p1 (1V), 3.º p7 (0V)
+//   G.C: 1.º p2 (2V), 2.º p3 (1V), 3.º p8 (0V)
+//
+// Advancing seeding (non-FPP groups_knockout):
+//   pos=0 (1sts) → [p5,p4,p2]; pos=1 (2nds) reversed → [p3,p1,p0]
+//   advancingPlayers = [p5,p4,p2,p3,p1,p0]
+//
+// SE(6) bracketSize=8, seeds=[1,8,4,5,2,7,3,6]:
+//   m0: p5 vs BYE → p5 avança  (idx 0,7)
+//   m1: p3 vs p1              (idx 3,4 → seed4=idx3=p3, seed5=idx4=p1)
+//   m2: p4 vs BYE → p4 avança  (idx 1,6)
+//   m3: p2 vs p0              (idx 2,5 → seed3=idx2=p2, seed6=idx5=p0)
+//   m4 (SF1): p5 vs winner(m1)
+//   m5 (SF2): p4 vs winner(m3)
+//   m6 (Final): winner(m4) vs winner(m5)
+
+async function seedGroupsCompleto() {
+  const t = await createTournament({
+    slug: "demo-grupos-completo",
+    adminToken: "admin-grupos-completo",
+    name: "Torneio Grupos + Knockout — Concluído",
+    description:
+      "9 duplas em 3 grupos de 3 (M3S). Todos os grupos terminados, vencedor coroado após SF + Final.",
+    format: "groups_knockout",
+    matchFormat: "M3S",
+    groupCount: 3,
+    advanceCount: 2,
+    status: "in_progress",
+    isPublic: true,
+    courtCount: 3,
+  });
+
+  const catOpen = await createCategory(t.id, {
+    code: "OPEN", name: "Open",
+    matchFormat: "M3S", format: "groups_knockout",
+    groupCount: 3, advanceCount: 2, status: "in_progress", order: 0,
+  });
+
+  const players = await createPlayers(t.id, catOpen.id, [
+    { player1: "Nuno Cardoso",   player2: "João Silva",      teamName: "Cardoso / Silva"    }, // 0 → G.A
+    { player1: "Rui Santos",     player2: "André Oliveira",  teamName: "Santos / Oliveira"  }, // 1 → G.B
+    { player1: "Miguel Costa",   player2: "Pedro Ferreira",  teamName: "Costa / Ferreira"   }, // 2 → G.C
+    { player1: "Luís Pereira",   player2: "Carlos Rodrigues"                                }, // 3 → G.C
+    { player1: "Tiago Mendes",   player2: "Bruno Alves"                                     }, // 4 → G.B
+    { player1: "Ricardo Sousa",  player2: "Filipe Gomes"                                    }, // 5 → G.A
+    { player1: "Hugo Martins",   player2: "Diogo Lopes"                                     }, // 6 → G.A
+    { player1: "Marco Neves",    player2: "Sérgio Pinto"                                    }, // 7 → G.B
+    { player1: "Diana Costa",    player2: "Marta Vieira"                                    }, // 8 → G.C
+  ]);
+
+  const { groupMatches: gm } = generateGroupsKnockout(9, 3);
+  const groupCreated = await createMatches(t.id, catOpen.id, gm, players);
+
+  // Schedule all group matches
+  for (let i = 0; i < groupCreated.length; i++) {
+    const round = gm[i].round;
+    await prisma.match.update({ where: { id: groupCreated[i].id }, data: {
+      scheduledAt: dateAt(-5 + round, 9 + (i % 3) * 2),
+      court: `Campo ${(i % 3) + 1}`,
+    }});
+  }
+
+  // ── Group A: p0vp5, p0vp6, p5vp6 → 1ºp5, 2ºp0, 3ºp6 ──────────────────
+  const gAReal = groupCreated.filter((_, i) => gm[i].groupIndex === 0 && gm[i].status !== "bye");
+  const gAR = [
+    { t1w: false, s: [{ team1: 4, team2: 6 }, { team1: 3, team2: 6 }] },  // p5>p0
+    { t1w: true,  s: [{ team1: 6, team2: 4 }, { team1: 6, team2: 3 }] },  // p0>p6
+    { t1w: true,  s: [{ team1: 6, team2: 2 }, { team1: 6, team2: 1 }] },  // p5>p6
+  ];
+  for (let i = 0; i < gAReal.length; i++) {
+    const m = await prisma.match.findUnique({ where: { id: gAReal[i].id } });
+    if (!m?.team1Id || !m?.team2Id) continue;
+    const [wId, lId] = gAR[i].t1w ? [m.team1Id, m.team2Id] : [m.team2Id, m.team1Id];
+    await submitResult(m.id, wId, lId, gAR[i].s, null, null, null, null);
+  }
+
+  // ── Group B: p1vp4, p1vp7, p4vp7 → 1ºp4, 2ºp1, 3ºp7 ──────────────────
+  const gBReal = groupCreated.filter((_, i) => gm[i].groupIndex === 1 && gm[i].status !== "bye");
+  const gBR = [
+    { t1w: false, s: [{ team1: 5, team2: 7 }, { team1: 4, team2: 6 }] },  // p4>p1
+    { t1w: true,  s: [{ team1: 6, team2: 3 }, { team1: 7, team2: 5 }] },  // p1>p7
+    { t1w: true,  s: [{ team1: 6, team2: 4 }, { team1: 6, team2: 3 }] },  // p4>p7
+  ];
+  for (let i = 0; i < gBReal.length; i++) {
+    const m = await prisma.match.findUnique({ where: { id: gBReal[i].id } });
+    if (!m?.team1Id || !m?.team2Id) continue;
+    const [wId, lId] = gBR[i].t1w ? [m.team1Id, m.team2Id] : [m.team2Id, m.team1Id];
+    await submitResult(m.id, wId, lId, gBR[i].s, null, null, null, null);
+  }
+
+  // ── Group C: p2vp3, p2vp8, p3vp8 → 1ºp2, 2ºp3, 3ºp8 ──────────────────
+  const gCReal = groupCreated.filter((_, i) => gm[i].groupIndex === 2 && gm[i].status !== "bye");
+  const gCR = [
+    { t1w: true, s: [{ team1: 6, team2: 3 }, { team1: 6, team2: 4 }] },  // p2>p3
+    { t1w: true, s: [{ team1: 6, team2: 1 }, { team1: 6, team2: 2 }] },  // p2>p8
+    { t1w: true, s: [{ team1: 6, team2: 2 }, { team1: 6, team2: 3 }] },  // p3>p8
+  ];
+  for (let i = 0; i < gCReal.length; i++) {
+    const m = await prisma.match.findUnique({ where: { id: gCReal[i].id } });
+    if (!m?.team1Id || !m?.team2Id) continue;
+    const [wId, lId] = gCR[i].t1w ? [m.team1Id, m.team2Id] : [m.team2Id, m.team1Id];
+    await submitResult(m.id, wId, lId, gCR[i].s, null, null, null, null);
+  }
+
+  // ── Generate knockout bracket ─────────────────────────────────────────────
+  // advancingPlayers = [p5, p4, p2, p3, p1, p0]  (non-FPP seeding as per route)
+  const advancingPlayers = [
+    players[5], players[4], players[2],  // 1sts: G.A, G.B, G.C
+    players[3], players[1], players[0],  // 2nds: G.C (rev), G.B, G.A (rev)
+  ];
+
+  const koInputs = generateSingleElimination(advancingPlayers.length, false);
+  const koMatches = await createMatches(t.id, catOpen.id, koInputs, advancingPlayers);
+
+  // Schedule knockout: SF = dia 0, Final = dia +1
+  const koSchedule = [
+    { day: 0, hour: 9,  court: "Campo 1" }, // m0 bye
+    { day: 0, hour: 9,  court: "Campo 2" }, // m1 p3 vs p1
+    { day: 0, hour: 11, court: "Campo 1" }, // m2 bye
+    { day: 0, hour: 11, court: "Campo 3" }, // m3 p2 vs p0
+    { day: 0, hour: 14, court: "Campo 1" }, // m4 SF1
+    { day: 0, hour: 14, court: "Campo 2" }, // m5 SF2
+    { day: 1, hour: 10, court: "Campo 1" }, // m6 Final
+  ];
+  for (let i = 0; i < koMatches.length; i++) {
+    const s = koSchedule[i];
+    if (!s) continue;
+    await prisma.match.update({ where: { id: koMatches[i].id }, data: {
+      scheduledAt: dateAt(s.day - 3, s.hour), court: s.court,
+    }});
+  }
+
+  // ── m1: p3 vs p1 → p1 wins ────────────────────────────────────────────────
+  const m1 = await prisma.match.findUnique({ where: { id: koMatches[1].id } });
+  if (m1?.team1Id && m1?.team2Id) {
+    await submitResult(m1.id, m1.team2Id, m1.team1Id,
+      [{ team1: 3, team2: 6 }, { team1: 4, team2: 6 }],
+      m1.nextMatchId, m1.nextMatchSlot, null, null);
+  }
+
+  // ── m3: p2 vs p0 → p2 wins ────────────────────────────────────────────────
+  const m3 = await prisma.match.findUnique({ where: { id: koMatches[3].id } });
+  if (m3?.team1Id && m3?.team2Id) {
+    await submitResult(m3.id, m3.team1Id, m3.team2Id,
+      [{ team1: 6, team2: 4 }, { team1: 7, team2: 5 }],
+      m3.nextMatchId, m3.nextMatchSlot, null, null);
+  }
+
+  // ── m4 (SF1): p5 vs p1 → p5 wins ─────────────────────────────────────────
+  const m4 = await prisma.match.findUnique({ where: { id: koMatches[4].id } });
+  if (m4?.team1Id && m4?.team2Id) {
+    await submitResult(m4.id, m4.team1Id, m4.team2Id,
+      [{ team1: 7, team2: 5 }, { team1: 6, team2: 3 }],
+      m4.nextMatchId, m4.nextMatchSlot, null, null);
+  }
+
+  // ── m5 (SF2): p4 vs p2 → p4 wins (STB) ───────────────────────────────────
+  const m5 = await prisma.match.findUnique({ where: { id: koMatches[5].id } });
+  if (m5?.team1Id && m5?.team2Id) {
+    await submitResult(m5.id, m5.team1Id, m5.team2Id,
+      [{ team1: 6, team2: 4 }, { team1: 4, team2: 6 }, { team1: 10, team2: 8, superTiebreak: true }],
+      m5.nextMatchId, m5.nextMatchSlot, null, null);
+  }
+
+  // ── m6 (Final): p5 vs p4 → p5 wins ───────────────────────────────────────
+  const m6 = await prisma.match.findUnique({ where: { id: koMatches[6].id } });
+  if (m6?.team1Id && m6?.team2Id) {
+    await submitResult(m6.id, m6.team1Id, m6.team2Id,
+      [{ team1: 6, team2: 4 }, { team1: 4, team2: 6 }, { team1: 10, team2: 7, superTiebreak: true }],
+      null, null, null, null);
+  }
+
+  await prisma.tournament.update({ where: { id: t.id }, data: { status: "completed" } });
+  await prisma.category.update({ where: { id: catOpen.id }, data: { status: "completed" } });
+  console.log("✓ Demo Grupos+KO Concluído → /tournament/demo-grupos-completo?token=admin-grupos-completo");
+}
+
+// ─── 8. Agenda Live — SE com auto-agenda e jogo em curso ─────────────────────
+//
+// SE 8 duplas, M3SPO. Auto-agenda configurada: 3 campos, 90min/jogo.
+// Cenário de demonstração:
+//   • QF2 está in_progress com startedAt = há 20 min (20min de atraso)
+//   • QF1, QF3, QF4: concluídos
+//   • SF1, SF2, Final: agendados nos campos correspondentes
+//   • slotMinutes=90, scheduleDays persistido no torneio
+// Propósito: mostrar agenda por campo, WhatsApp, início de jogo, delay-push.
+
+async function seedAgendaLive() {
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const t = await createTournament({
+    slug: "demo-agenda-live",
+    adminToken: "admin-agenda-live",
+    name: "Open Braga — Agenda em Tempo Real",
+    description:
+      "SE 8 duplas com agenda automática configurada (3 campos, 90 min/jogo). Um jogo está a decorrer — demonstra o acompanhamento em tempo real e notificações WhatsApp.",
+    format: "single_elimination",
+    matchFormat: "M3SPO",
+    thirdPlace: false,
+    status: "in_progress",
+    isPublic: true,
+    courtCount: 3,
+  });
+
+  // Persist auto-schedule config so the delay-push logic has the window to check
+  await prisma.tournament.update({
+    where: { id: t.id },
+    data: {
+      slotMinutes: 90,
+      scheduleDays: JSON.stringify([
+        { date: todayStr, startTime: "09:00", endTime: "18:00" },
+      ]),
+    },
+  });
+
+  const catOpen = await createCategory(t.id, {
+    code: "OPEN", name: "Open",
+    matchFormat: "M3SPO", format: "single_elimination",
+    status: "in_progress", order: 0,
+  });
+
+  const players = await createPlayers(t.id, catOpen.id, [
+    { player1: "Nuno Cardoso",    player2: "João Silva",        teamName: "Cardoso / Silva"    }, // 0 seed 1
+    { player1: "Rui Santos",      player2: "André Oliveira",    teamName: "Santos / Oliveira"  }, // 1 seed 2
+    { player1: "Miguel Costa",    player2: "Pedro Ferreira",    teamName: "Costa / Ferreira"   }, // 2 seed 3
+    { player1: "Luís Pereira",    player2: "Carlos Rodrigues",  teamName: "Pereira / Rodrigues" }, // 3 seed 4
+    { player1: "Tiago Mendes",    player2: "Bruno Alves",       teamName: "Mendes / Alves"     }, // 4 seed 5
+    { player1: "Ricardo Sousa",   player2: "Filipe Gomes",      teamName: "Sousa / Gomes"      }, // 5 seed 6
+    { player1: "Hugo Martins",    player2: "Diogo Lopes",       teamName: "Martins / Lopes"    }, // 6 seed 7
+    { player1: "Marco Neves",     player2: "Sérgio Pinto",      teamName: "Neves / Pinto"      }, // 7 seed 8
+  ]);
+
+  // SE(8) no third place: QF[0..3], SF[4,5], Final[6]
+  // Seeding [1,8,4,5,2,7,3,6]:
+  //   QF0: p0(s1) vs p7(s8)
+  //   QF1: p3(s4) vs p4(s5)
+  //   QF2: p1(s2) vs p6(s7)
+  //   QF3: p2(s3) vs p5(s6)
+  const inputs = generateSingleElimination(8, false);
+  const matches = await createMatches(t.id, catOpen.id, inputs, players);
+
+  // Build schedule (QF round 1, SF round 2, Final round 3)
+  // 3 courts, 90 min slots — QF start 09:00; SF 10:30; Final 12:00
+  const schedule: { hour: number; min: number; court: string }[] = [
+    { hour: 9,  min: 0,  court: "Campo 1" }, // QF0 (complete)
+    { hour: 9,  min: 0,  court: "Campo 2" }, // QF1 ← in_progress
+    { hour: 9,  min: 0,  court: "Campo 3" }, // QF2 (complete)
+    { hour: 9,  min: 0,  court: "Campo 1" }, // QF3 (complete) — 2nd slot Campo 1, sequenced
+    { hour: 10, min: 30, court: "Campo 1" }, // SF1
+    { hour: 10, min: 30, court: "Campo 2" }, // SF2
+    { hour: 12, min: 0,  court: "Campo 1" }, // Final
+  ];
+
+  for (let i = 0; i < Math.min(matches.length, schedule.length); i++) {
+    const s = schedule[i];
+    const d = new Date(today);
+    d.setHours(s.hour, s.min, 0, 0);
+    await prisma.match.update({ where: { id: matches[i].id }, data: {
+      scheduledAt: d, court: s.court,
+    }});
+  }
+
+  // ── QF0 (p0 vs p7): completed ─────────────────────────────────────────────
+  const qf0 = await prisma.match.findUnique({ where: { id: matches[0].id } });
+  if (qf0?.team1Id && qf0?.team2Id) {
+    await submitResult(qf0.id, qf0.team1Id, qf0.team2Id,
+      [{ team1: 6, team2: 3 }, { team1: 6, team2: 4 }],
+      qf0.nextMatchId, qf0.nextMatchSlot, null, null);
+  }
+
+  // ── QF2 (p1 vs p6): completed ─────────────────────────────────────────────
+  const qf2 = await prisma.match.findUnique({ where: { id: matches[2].id } });
+  if (qf2?.team1Id && qf2?.team2Id) {
+    await submitResult(qf2.id, qf2.team1Id, qf2.team2Id,
+      [{ team1: 7, team2: 6, tiebreak: { team1: 7, team2: 4 } }, { team1: 6, team2: 3 }],
+      qf2.nextMatchId, qf2.nextMatchSlot, null, null);
+  }
+
+  // ── QF3 (p2 vs p5): completed ─────────────────────────────────────────────
+  const qf3 = await prisma.match.findUnique({ where: { id: matches[3].id } });
+  if (qf3?.team1Id && qf3?.team2Id) {
+    await submitResult(qf3.id, qf3.team1Id, qf3.team2Id,
+      [{ team1: 6, team2: 2 }, { team1: 6, team2: 3 }],
+      qf3.nextMatchId, qf3.nextMatchSlot, null, null);
+  }
+
+  // ── QF1 (p3 vs p4): in_progress — começou há 20 minutos ──────────────────
+  const startedAt = new Date(Date.now() - 20 * 60 * 1000);
+  await prisma.match.update({
+    where: { id: matches[1].id },
+    data: { status: "in_progress", startedAt },
+  });
+
+  console.log("✓ Demo Agenda Live → /tournament/demo-agenda-live?token=admin-agenda-live");
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -832,6 +1144,8 @@ async function main() {
   await seedRoundRobin();
   await seedGroupsKnockout();
   await seedDoubleElimination();
+  await seedGroupsCompleto();
+  await seedAgendaLive();
 
   console.log("\n✅ Seed concluído com sucesso!\n");
   console.log("Torneios criados:");
@@ -841,6 +1155,9 @@ async function main() {
   console.log("  /tournament/demo-roundrobin?token=admin-roundrobin");
   console.log("  /tournament/demo-grupos?token=admin-grupos");
   console.log("  /tournament/demo-dupla?token=admin-dupla");
+  console.log("  /tournament/demo-grupos-completo?token=admin-grupos-completo");
+  console.log("  /tournament/demo-agenda-live?token=admin-agenda-live");
+  console.log("\nPainel global: /admin?token=padel-admin-2025");
 }
 
 main()
