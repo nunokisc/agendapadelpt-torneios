@@ -5,7 +5,9 @@ import { useEffect } from "react";
 export default function PwaRegister() {
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      // updateViaCache:'none' tells the browser to always bypass the HTTP cache
+      // when fetching sw.js for update checks — critical for fast SW rollouts.
+      navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).catch(() => {});
     }
   }, []);
   return null;
