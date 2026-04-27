@@ -45,6 +45,9 @@ export async function PATCH(
   if (!match || match.tournamentId !== tournament.id) {
     return NextResponse.json({ error: "Jogo não encontrado" }, { status: 404 });
   }
+  if (match.status === "completed" || match.status === "in_progress") {
+    return NextResponse.json({ error: "Não é possível reagendar um jogo já realizado ou em curso" }, { status: 409 });
+  }
 
   const updated = await prisma.match.update({
     where: { id: matchId },
@@ -69,7 +72,7 @@ export async function POST(
     where: { slug },
     include: {
       matches: {
-        where: { status: { not: "bye" } },
+        where: { status: { notIn: ["bye", "completed", "in_progress"] } },
         orderBy: [{ round: "asc" }, { position: "asc" }],
       },
     },
