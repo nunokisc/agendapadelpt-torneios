@@ -34,7 +34,12 @@ function computeStats(matches: Match[], players: Player[]): TeamStat[] {
     const scores: SetScore[] = JSON.parse(m.scores);
     let s1 = 0, s2 = 0, g1 = 0, g2 = 0;
     for (const s of scores) {
-      if (s.team1 > s.team2) s1++; else s2++;
+      if (s.team1 > s.team2) s1++;
+      else if (s.team2 > s.team1) s2++;
+      else if (s.tiebreak) {
+        if (s.tiebreak.team1 > s.tiebreak.team2) s1++;
+        else if (s.tiebreak.team2 > s.tiebreak.team1) s2++;
+      }
       g1 += s.team1; g2 += s.team2;
     }
     const t1 = map.get(m.team1Id);

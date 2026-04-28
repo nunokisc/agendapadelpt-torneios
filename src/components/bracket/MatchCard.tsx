@@ -47,8 +47,12 @@ export default function MatchCard({ match, isAdmin, onClick, onStart, highlight,
     return `${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}`;
   }
 
-  const team1Sets = scores.filter((s) => s.team1 > s.team2).length;
-  const team2Sets = scores.filter((s) => s.team2 > s.team1).length;
+  const team1Sets = scores.filter((s) =>
+    s.team1 > s.team2 || (s.team1 === s.team2 && !!s.tiebreak && s.tiebreak.team1 > s.tiebreak.team2)
+  ).length;
+  const team2Sets = scores.filter((s) =>
+    s.team2 > s.team1 || (s.team1 === s.team2 && !!s.tiebreak && s.tiebreak.team2 > s.tiebreak.team1)
+  ).length;
 
   const isBye = match.status === "bye";
   const isCompleted = match.status === "completed";
