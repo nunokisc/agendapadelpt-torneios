@@ -4,7 +4,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import ThemeToggle from "@/components/ui/ThemeToggle";
 
 // Read the resolved theme to update logo colours — works with both data-theme attr and dark class
 function useTheme() {
@@ -92,14 +91,10 @@ export default function Header() {
             >
               ← agendapadel.pt
             </a>
-            <div className="ml-3">
-              <ThemeToggle />
-            </div>
           </div>
 
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center gap-2">
-            <ThemeToggle />
             <button
               className="p-2 rounded-lg text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800"
               onClick={() => setMobileOpen(!mobileOpen)}
