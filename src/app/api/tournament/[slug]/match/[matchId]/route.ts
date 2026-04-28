@@ -434,12 +434,12 @@ export async function DELETE(
     if (match.categoryId) {
       const cat = await tx.category.findUnique({ where: { id: match.categoryId }, select: { status: true } });
       if (cat?.status === "completed") {
-        await tx.category.update({ where: { id: match.categoryId }, data: { status: "active" } });
+        await tx.category.update({ where: { id: match.categoryId }, data: { status: "in_progress" } });
       }
     }
     const tourn = await tx.tournament.findUnique({ where: { id: tournament.id }, select: { status: true } });
     if (tourn?.status === "completed") {
-      await tx.tournament.update({ where: { id: tournament.id }, data: { status: "active" } });
+      await tx.tournament.update({ where: { id: tournament.id }, data: { status: "in_progress" } });
     }
   });
 
