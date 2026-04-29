@@ -163,22 +163,30 @@ export async function POST(
     return a.position - b.position;
   });
 
-  // Per-court pointer: start after any already-scheduled match on each court
+  // Per-court and per-team pointer: start after any already-scheduled match
   const existingScheduled = await prisma.match.findMany({
     where: {
       tournamentId: tournament.id,
       scheduledAt: { not: null },
       status: { in: ["completed", "in_progress", "pending"] },
     },
-    select: { court: true, scheduledAt: true },
+    select: { court: true, scheduledAt: true, team1Id: true, team2Id: true },
   });
 
   const courtLastEndMs: Record<string, number> = {};
+  const teamNextFreeMs: Record<string, number> = {};
+
   for (const em of existingScheduled) {
-    if (!em.court || !em.scheduledAt) continue;
+    if (!em.scheduledAt) continue;
     const endMs = em.scheduledAt.getTime() + msPerMatch;
-    if (!courtLastEndMs[em.court] || endMs > courtLastEndMs[em.court]) {
+    if (em.court && endMs > (courtLastEndMs[em.court] ?? 0)) {
       courtLastEndMs[em.court] = endMs;
+    }
+    if (em.team1Id && endMs > (teamNextFreeMs[em.team1Id] ?? 0)) {
+      teamNextFreeMs[em.team1Id] = endMs;
+    }
+    if (em.team2Id && endMs > (teamNextFreeMs[em.team2Id] ?? 0)) {
+      teamNextFreeMs[em.team2Id] = endMs;
     }
   }
 
@@ -209,9 +217,20 @@ export async function POST(
 
   allMatches.forEach((m, i) => {
     const courtName = `Campo ${(i % courts) + 1}`;
-    const scheduledAt = nextSlotAfter(courtNextFreeMs[courtName]);
+
+    // Earliest slot where the court AND both teams are free
+    const t1Free = m.team1Id ? (teamNextFreeMs[m.team1Id] ?? 0) : 0;
+    const t2Free = m.team2Id ? (teamNextFreeMs[m.team2Id] ?? 0) : 0;
+    const notBefore = Math.max(courtNextFreeMs[courtName], t1Free, t2Free);
+
+    const scheduledAt = nextSlotAfter(notBefore);
     if (!scheduledAt) return;
-    courtNextFreeMs[courtName] = scheduledAt.getTime() + msPerMatch;
+
+    const endMs = scheduledAt.getTime() + msPerMatch;
+    courtNextFreeMs[courtName] = endMs;
+    if (m.team1Id) teamNextFreeMs[m.team1Id] = endMs;
+    if (m.team2Id) teamNextFreeMs[m.team2Id] = endMs;
+
     updates.push({ id: m.id, court: courtName, scheduledAt });
   });
 
