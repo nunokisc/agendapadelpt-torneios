@@ -38,7 +38,10 @@ export async function PATCH(
   const { slug } = await params;
   const token = extractAdminToken(req, slug);
 
-  const tournament = await prisma.tournament.findUnique({ where: { slug } });
+  const tournament = await prisma.tournament.findUnique({
+    where: { slug },
+    select: { id: true, adminToken: true, slotMinutes: true },
+  });
   if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
   if (tournament.adminToken !== token) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
 
@@ -54,6 +57,35 @@ export async function PATCH(
   }
   if (match.status === "completed" || match.status === "in_progress") {
     return NextResponse.json({ error: "Não é possível reagendar um jogo já realizado ou em curso" }, { status: 409 });
+  }
+
+  // Server-side conflict check: verify court is free at the requested slot
+  const effectiveCourt = court !== undefined ? court : match.court;
+  const effectiveTime = scheduledAt !== undefined ? scheduledAt : (match.scheduledAt ? match.scheduledAt.toISOString() : null);
+  if (effectiveCourt && effectiveTime) {
+    const slotMs = (tournament.slotMinutes ?? 90) * 60_000;
+    const newStart = new Date(effectiveTime).getTime();
+    const newEnd = newStart + slotMs;
+    const conflicting = await prisma.match.findFirst({
+      where: {
+        tournamentId: tournament.id,
+        id: { not: matchId },
+        court: effectiveCourt,
+        scheduledAt: { not: null, lt: new Date(newEnd) },
+      },
+      include: { team1: true, team2: true },
+    });
+    if (conflicting) {
+      const cStart = conflicting.scheduledAt!.getTime();
+      const cEnd = cStart + slotMs;
+      if (cEnd > newStart) {
+        const who = `${conflicting.team1?.name ?? "?"} vs ${conflicting.team2?.name ?? "?"}`;
+        return NextResponse.json(
+          { error: `${effectiveCourt} já está ocupado nesse horário (${who})` },
+          { status: 409 }
+        );
+      }
+    }
   }
 
   const updated = await prisma.match.update({
