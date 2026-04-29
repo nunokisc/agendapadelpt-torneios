@@ -42,9 +42,24 @@ export function useTournamentSSE(
     const eventSource = new EventSource(`/api/tournament/${slug}/stream`);
     let closed = false;
 
+    eventSource.addEventListener("match_completed", () => {
+      onUpdateRef.current();
+      showLocalNotification("Resultado registado", "Um resultado foi submetido no torneio.", slug);
+    });
+
+    eventSource.addEventListener("match_started", () => {
+      onUpdateRef.current();
+      showLocalNotification("Jogo iniciado", "Um jogo foi marcado como em curso.", slug);
+    });
+
+    eventSource.addEventListener("match_reset", () => {
+      onUpdateRef.current();
+      showLocalNotification("Resultado reposto", "Um resultado foi anulado.", slug);
+    });
+
+    // fallback: legacy event name (clients connected during a deploy)
     eventSource.addEventListener("match_updated", () => {
       onUpdateRef.current();
-      showLocalNotification("Resultado atualizado", "Um resultado foi registado no torneio.", slug);
     });
 
     eventSource.addEventListener("bracket_generated", () => {

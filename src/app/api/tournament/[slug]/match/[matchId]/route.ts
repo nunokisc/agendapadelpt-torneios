@@ -331,7 +331,7 @@ export async function PUT(
     return { match: updatedMatch };
   });
 
-  broadcastUpdate(tournament.id, "match_updated", { matchId, slug });
+  broadcastUpdate(tournament.id, "match_completed", { matchId, slug });
 
   return NextResponse.json(result);
 }
@@ -369,7 +369,7 @@ export async function PATCH(
     include: { team1: true, team2: true },
   });
 
-  broadcastUpdate(tournament.id, "match_updated", { matchId, slug });
+  broadcastUpdate(tournament.id, "match_started", { matchId, slug });
 
   return NextResponse.json({ match: updated });
 }
@@ -466,6 +466,6 @@ export async function DELETE(
     }
   });
 
-  broadcastUpdate(tournament.id, "match_updated", { matchId, slug });
+  broadcastUpdate(tournament.id, "match_reset", { matchId, slug });
   return NextResponse.json({ success: true });
 }
