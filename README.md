@@ -133,12 +133,10 @@ Critérios de desempate (por ordem):
 5. Saldo de jogos no confronto directo
 
 ### Gestão de torneios (admin)
-- **Editar** — nome, descrição, número de campos, torneio público, inscrições abertas
+- **Editar** — nome, descrição, número de campos, datas de início/fim, torneio público, inscrições abertas
 - **Eliminar** — apaga torneio e todos os dados associados
 - **Clonar** — cria novo rascunho com as mesmas duplas, séries e configurações (mapeamento de categoryId preservado)
 - **Gerir Categorias** — adicionar ou remover séries em qualquer torneio (série só pode ser removida se ainda em rascunho e existir pelo menos uma outra)
-- Separador **Agenda** — definir campo e hora por jogo ou agendar automaticamente todos os jogos distribuídos pelos campos disponíveis
-- Botão **WhatsApp** por jogo agendado — abre o WhatsApp com mensagem pré-formatada (nomes das duplas, data/hora, campo, nome do torneio) para partilhar num grupo
 - Separador **Inscrições** — aprovar ou rejeitar inscrições pendentes de duplas; em torneios multi-série o admin pode mudar a série antes de aprovar
 
 ### Auto-inscrição pública
@@ -148,12 +146,79 @@ Critérios de desempate (por ordem):
 - Inscrições ficam pendentes até o admin aprovar (cria dupla na série correspondente) ou rejeitar
 - Activado por `registrationOpen` no torneio
 
-### Agenda e campos
-- `courtCount` no torneio define o número de campos disponíveis
-- **Auto-agendamento** — distribui todos os jogos pelos campos disponíveis com duração configurável e janelas horárias por dia (suporta múltiplos dias); respeita jogos já concluídos ou em curso ao calcular o próximo slot livre por campo
-- `slotMinutes` e `scheduleDays` (JSON) ficam persistidos no torneio após auto-agendamento, permitindo ao _delay-push_ calcular o fim de cada janela diária
-- Cada jogo pode ter campo e hora definidos individualmente via separador Agenda
-- Jogos já concluídos ou em curso não podem ser reagendados (bloqueio na API)
+---
+
+### Agenda e horário
+
+O sistema de agendamento é **global ao torneio** — todas as séries são agendadas numa vista única, não série a série.
+
+#### Separador "Horário" (público) / "Agenda" (admin)
+
+- Disponível como tab de nível superior (acima das tabs de série), acessível antes de qualquer bracket estar gerado
+- **Vista pública**: tabela de leitura em modo horário, agrupada por dia, com intervalo completo (ex. `09:00–10:30`), campo, séries e estado
+- **Vista admin**: idêntica mas com botão de edição por linha
+- Linha com destaque colorido por estado: azul para jogos em curso, verde para concluídos
+- **Bottom nav mobile**: botão "Horário" para o público; botão "Agenda" para o admin
+
+#### Filtro por série (multi-selecção)
+
+- Chips de série permitem seleccionar **uma ou várias séries em simultâneo** para filtrar a vista
+- "Todas" limpa a selecção e mostra todos os jogos
+- O filtro aplica-se também ao agendamento automático e ao reset — é possível agendar apenas MX4 para sexta-feira e o resto noutro momento
+
+#### Agendamento manual (admin)
+
+- Cada linha tem botão "Agendar" / "Editar" que abre um painel inline
+- Painel inline: campo (texto livre) + data/hora início + hora fim calculada automaticamente
+- **Detecção de conflitos em tempo real** (client-side): ao alterar campo ou hora, o sistema verifica imediatamente se o campo já está ocupado naquele intervalo por outro jogo; mostra aviso em âmbar com o jogo conflituante e o seu intervalo
+- **Validação server-side** (PATCH): a API retorna 409 se o campo já estiver ocupado no slot pedido, mesmo que o admin tente forçar através de outro meio
+- Jogos concluídos ou em curso não podem ser reagendados
+
+#### Agendamento automático (admin)
+
+- Distribui os jogos **sem hora marcada** pelos campos disponíveis
+- Configuração: um ou mais dias com data, hora de início e hora de fim (padrão 09:00–23:59); duração por jogo em minutos
+- Garante **dois tipos de conflito impossíveis**:
+  1. Mesmo campo, mesmo slot → nunca dois jogos no mesmo campo ao mesmo tempo
+  2. Mesma dupla → nunca a mesma dupla a jogar em dois campos ao mesmo tempo (rastreamento de disponibilidade por dupla)
+- Os jogos já agendados (qualquer estado) **nunca são sobrescritos** — apenas os pendentes sem hora são distribuídos
+- A ordem de agendamento respeita as fases: grupos → winners → losers → 3.º lugar → final
+- Botão "Usar datas do torneio" pré-preenche os dias a partir de `startDate`/`endDate`
+- `slotMinutes` e `scheduleDays` ficam persistidos no torneio após cada execução
+
+#### Reset de agenda (admin)
+
+- Botão "Limpar agenda" apaga campo e hora dos jogos pendentes
+- Respeita o filtro activo: se uma série estiver seleccionada, só limpa essa(s) série(s); caso contrário limpa todo o torneio
+- Jogos concluídos ou em curso nunca são afectados
+
+#### Partilha WhatsApp (admin)
+
+- Cada jogo com campo e hora tem um ícone WhatsApp que abre mensagem pré-formatada com nomes das duplas, data/hora e campo
+- Visível apenas para admins (oculto na vista pública)
+
+---
+
+### Formulário de criação — estimativa de capacidade
+
+O formulário de criação inclui uma secção **Disponibilidade** com:
+- Datas de início e fim do torneio (guardadas no modelo)
+- Tabela de horários por dia gerada automaticamente (um dia por linha): hora início e hora fim editáveis individualmente
+- Campo "Duração por jogo" (padrão 90 min, guardado como `slotMinutes`)
+
+Com base nestes dados e no formato/configuração escolhidos, é calculada em tempo real uma **estimativa de capacidade**:
+- Total de slots disponíveis (campos × Σ slots/dia)
+- Breakdown de jogos por fase para o formato seleccionado:
+  - **Grupos + Eliminação**: jogos de grupos + jogos knockout, com base em `groupCount`/`advanceCount`
+  - **Eliminação Simples**: N−1 (+ 1 se jogo do 3.º lugar)
+  - **Eliminação Dupla**: 2×(N−1)
+  - **Round Robin**: N×(N−1)/2
+- Controlo ± de "duplas por série" (2–32)
+- Resultado: verde (cabe, com slots livres) ou vermelho (não cabe, com jogos a mais e máximo de séries possível)
+
+O valor `slotMinutes` definido na criação é herdado pelo agendador automático como valor por omissão.
+
+---
 
 ### "Os meus jogos"
 - Página `/tournament/[slug]/minha-dupla` — pesquisa por nome (mín. 2 letras) e vê todos os jogos da dupla
@@ -179,7 +244,7 @@ Critérios de desempate (por ordem):
 - Ícone, splash screen e theme color configurados
 
 ### UX mobile
-- **Bottom navigation** fixo em mobile: Bracket / Os meus jogos / Estatísticas (vista pública) ou Bracket / Agenda / Inscrições (admin)
+- **Bottom navigation** fixo em mobile: Bracket / Horário / Os meus jogos / Estatísticas (público) ou Bracket / Agenda / Inscrições (admin)
 - Bracket em mobile com tabs por ronda (lista de jogos); bracket visual completo em desktop
 - Eliminação dupla e grupos com tabs por secção em mobile
 - Dark mode com toggle (persiste em `localStorage`, sem flash ao carregar)
@@ -308,9 +373,9 @@ src/
 │   │   ├── admin/route.ts                # GET /api/admin (token plataforma)
 │   │   ├── tournaments/route.ts          # GET /api/tournaments (públicos)
 │   │   └── tournament/
-│   │       ├── route.ts                  # POST /api/tournament (criar; suporta tournamentMode + categories)
+│   │       ├── route.ts                  # POST /api/tournament (criar; suporta startDate/endDate/slotMinutes)
 │   │       └── [slug]/
-│   │           ├── route.ts              # GET (inclui categories com players+matches) / PATCH / DELETE
+│   │           ├── route.ts              # GET / PATCH (suporta startDate/endDate) / DELETE
 │   │           ├── categories/
 │   │           │   ├── route.ts          # GET listar séries; POST adicionar série por código
 │   │           │   └── [categoryId]/route.ts  # PUT actualizar; DELETE remover série
@@ -320,11 +385,11 @@ src/
 │   │           ├── clone/route.ts        # POST clonar (remapeia categoryIds)
 │   │           ├── register/route.ts     # GET/POST/PATCH inscrições (aceita categoryId)
 │   │           ├── reset/route.ts        # POST repor bracket (opcional: só uma categoria)
-│   │           ├── schedule/route.ts     # PATCH/POST agenda de jogos
+│   │           ├── schedule/route.ts     # PATCH (manual c/ conflito 409) / POST (auto) / DELETE (reset)
 │   │           ├── export/route.ts       # GET exportar CSV / iCal
 │   │           └── stream/route.ts       # GET SSE para live updates
 │   └── tournament/[slug]/
-│       ├── page.tsx                      # Vista principal (tabs por série; FPP confirm dialog)
+│       ├── page.tsx                      # Vista principal; tabs Bracket/Horário globais acima das séries
 │       ├── bracket/page.tsx              # Ecrã completo + tabs por série (?cat=) + imprimir
 │       ├── minha-dupla/page.tsx          # "Os meus jogos" — pesquisa por nome
 │       ├── stats/page.tsx                # Estatísticas por dupla
@@ -338,18 +403,18 @@ src/
 │   │   ├── GroupStageView.tsx            # Grupos com tabs mobile
 │   │   └── BracketConnector.tsx          # Linhas SVG entre jogos
 │   ├── tournament/
-│   │   ├── CreateTournamentForm.tsx      # Toggle Manual/FPP Auto; selector séries; FPPAutoInfo
+│   │   ├── CreateTournamentForm.tsx      # Criação: modo/formato/séries/campos/disponibilidade/capacidade
 │   │   ├── PlayerList.tsx                # Duplas: drag & drop, bulk import, check-in (passa categoryId)
 │   │   ├── MyTournaments.tsx             # Painel localStorage
 │   │   ├── ScoreInputModal.tsx           # Introdução de resultados com +/− buttons
-│   │   ├── TournamentHeader.tsx          # Editar / Eliminar / Clonar
+│   │   ├── TournamentHeader.tsx          # Editar (c/ startDate/endDate) / Eliminar / Clonar
 │   │   ├── LinkShare.tsx                 # Partilhar link + QR code
-│   │   ├── ScheduleManager.tsx           # Agenda de jogos + WhatsApp notification
+│   │   ├── ScheduleManager.tsx           # Agenda global: tabela, filtro multi-série, auto-schedule, conflitos
 │   │   └── RegistrationPanel.tsx         # Aprovar/rejeitar; filtro por série; mudar série
 │   └── layout/
 │       ├── Header.tsx
 │       ├── Footer.tsx
-│       ├── TournamentBottomNav.tsx        # Bottom nav fixo em mobile
+│       ├── TournamentBottomNav.tsx        # Bottom nav: Bracket/Horário/Os meus jogos/Estatísticas
 │       └── PwaRegister.tsx               # Registo do service worker
 ├── lib/
 │   ├── bracket-engine.ts                 # generateSingleElimination / RR / Groups / DE
@@ -360,7 +425,7 @@ src/
 │   ├── standings.ts                      # computeGroupStandings (5 critérios de desempate)
 │   ├── bulk-import.ts                    # parseBulkText — parser de importação em massa
 │   ├── my-tournaments.ts                 # localStorage helpers
-│   ├── validators.ts                     # Zod schemas (tournamentMode; categories)
+│   ├── validators.ts                     # Zod schemas (tournamentMode; categories; startDate/endDate/slotMinutes)
 │   └── db.ts / slug.ts / utils.ts / seeding.ts / round-robin.ts
 ├── __tests__/
 │   ├── scoring.test.ts                   # 100+ testes de scoring por formato (FFT + FPP + aliases + No-Ad)
@@ -385,7 +450,8 @@ prisma/
     ├── 20260425_checkin/
     ├── 20260426_starpoint/
     ├── 20260427_categories/              # Adiciona Category; tournamentMode; categoryId em Player/Match/Registration
-    └── 20260427_schedule/               # Adiciona slotMinutes e scheduleDays ao Tournament; startedAt ao Match
+    ├── 20260427_schedule/               # Adiciona slotMinutes e scheduleDays ao Tournament; startedAt ao Match
+    └── 20260429_tournament_dates/       # Adiciona startDate e endDate ao Tournament
 
 scripts/
 ├── setup-db.mjs                          # Cria/actualiza DB e aplica migrations (idempotente)
@@ -415,9 +481,11 @@ model Tournament {
   advanceCount     Int?
   isPublic         Boolean    @default(false)
   registrationOpen Boolean    @default(false)
-  courtCount       Int?
-  slotMinutes      Int?       // minutos por slot (definido pelo auto-agendamento)
-  scheduleDays     String?    // JSON: [{date,startTime,endTime}[]] (janelas de agenda)
+  courtCount       Int?                            // número de campos disponíveis
+  slotMinutes      Int?                            // duração por jogo em minutos (definido na criação ou no auto-agendamento)
+  scheduleDays     String?                         // JSON: [{date,startTime,endTime}[]] (janelas de agenda)
+  startDate        DateTime?                       // data de início do torneio
+  endDate          DateTime?                       // data de fim do torneio
   categories       Category[]
 }
 
@@ -499,6 +567,20 @@ Painel global: `/admin?token=padel-admin-2025`
 
 ## Notas de implementação
 
+**Agendamento global**: o `ScheduleManager` recebe `allMatches` (todos os jogos do torneio) e `categories` (todas as séries). O filtro por série (`selectedCats: Set<string>`) é um estado local do componente — não afecta os dados, só o que é apresentado e o scope do auto-agendamento/reset. A tab "Horário"/"Agenda" é renderizada ao nível do torneio, acima das tabs de série.
+
+**Prevenção de conflitos no agendamento automático**: o auto-agendador rastreia dois recursos em paralelo para cada slot:
+1. `courtNextFreeMs` — quando cada campo fica livre
+2. `teamNextFreeMs` — quando cada dupla fica disponível (por `team1Id`/`team2Id`)
+
+Para cada jogo a agendar, o `notBefore = max(courtFree, team1Free, team2Free)`. Após agendar, os três pointers são actualizados. Ambos os maps são inicializados a partir dos jogos já agendados na DB, garantindo que o agendamento incremental (por série ou por lote) respeita sempre o que já existe.
+
+**Conflito manual (PATCH)**: a API PATCH de agendamento valida sobreposição de intervalo server-side: busca jogos no mesmo campo com `scheduledAt < newEnd` e verifica `existingEnd > newStart`. Em caso de conflito, retorna 409 com os nomes das duplas conflituantes. O `EditPanel` faz a mesma verificação client-side em tempo real contra o state React, mostrando aviso imediato sem depender da API.
+
+**Cálculo de intervalo**: `slotMinutes` é guardado no torneio e usado como duração por omissão em todo o sistema — coluna "Hora" do horário mostra `início–fim` (ex. `09:00–10:30`), conflito manual usa `slotMinutes` para calcular sobreposição, e o delay-push usa-o para saber o fim do slot de cada jogo.
+
+**Estimativa de capacidade na criação**: `matchesPerCategory(format, groupCount, advanceCount, teams, thirdPlace)` é uma função puramente client-side que calcula o número de jogos por série para cada formato. O total de slots disponíveis é `Σ(floor((endMin − startMin) / slotMinutes) × courts)` por dia. A comparação é feita em tempo real conforme o utilizador ajusta os parâmetros.
+
 **Delay-push de agenda**: quando um jogo tem `startedAt` registado e demora mais do que `slotMinutes` do torneio, o servidor calcula o atraso em milissegundos ao receber o resultado. Os jogos seguintes no mesmo campo com `scheduledAt > match.scheduledAt` são empurrados pelo mesmo valor de atraso. Se o novo horário ultrapassar o fim da janela diária (`scheduleDays`), o jogo é desagendado (campo e hora removidos) — nunca se agenda além do fim do dia.
 
 **Reset de resultado**: o modal `ScoreInputModal` permite repor o resultado de um jogo concluído com confirmação explícita. A API bloqueia o reset se o jogo seguinte no bracket já tiver resultado (para jogos de knockout e grupo). Para grupos, o reset é adicionalmente bloqueado se já existirem resultados no bracket de knockout.
@@ -529,6 +611,6 @@ Painel global: `/admin?token=padel-admin-2025`
 
 **SSR e localStorage**: componentes que dependem de `localStorage` usam um estado `ready` inicializado a `false` para evitar hydration mismatch.
 
-**Separação admin/público**: a presença do query param `?token=<adminToken>` na URL é o único critério que activa os controlos de edição. Sem token, a página é completamente read-only.
+**Separação admin/público**: a presença do query param `?token=<adminToken>` na URL é o único critério que activa os controlos de edição. Sem token, a página é completamente read-only. O botão WhatsApp do horário é igualmente restrito ao admin.
 
 **Modelo de dados "dupla"**: o modelo `Player` representa uma dupla de padel. Os campos `player1Name` e `player2Name` guardam os nomes individuais; `name` é o nome de exibição. Todo o código interno usa `Player`/`team` por razões históricas do ORM mas a terminologia visível ao utilizador é "dupla".
