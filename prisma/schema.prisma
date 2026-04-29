@@ -100,6 +100,7 @@ model Match {
   scheduledAt   DateTime?
   court         String?
   startedAt     DateTime?
+  walkover      String?   // "team1" | "team2" — equipa que não compareceu
 
   status        String  @default("pending")
 

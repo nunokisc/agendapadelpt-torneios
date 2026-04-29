@@ -85,6 +85,8 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
   const [loading, setLoading] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [showWalkover, setShowWalkover] = useState(false);
+  const [walkovertLoading, setWalkovertLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -100,6 +102,7 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
       setSets(buildInitialSets(format));
     }
     setError(null);
+    setShowWalkover(false);
   }, [match, format]);
 
   if (!match) return null;
@@ -205,6 +208,27 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
       setConfirmReset(false);
     } finally {
       setResetting(false);
+    }
+  }
+
+  async function handleWalkover(side: "team1" | "team2") {
+    if (!match) return;
+    setWalkovertLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/tournament/${slug}/match/${match.id}?token=${token}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walkover: side }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Erro ao registar falta");
+      toast("Falta de comparência registada");
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido");
+    } finally {
+      setWalkovertLoading(false);
     }
   }
 
@@ -327,6 +351,50 @@ export default function ScoreInputModal({ match, slug, token, matchFormat, onClo
               Vencedor: <strong>{winnerName}</strong>{" "}
               <span className="font-mono text-xs">({t1Sets}–{t2Sets})</span>
             </p>
+          </div>
+        )}
+
+        {/* Walkover / falta de comparência */}
+        {match.status !== "completed" && (
+          <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+            {!showWalkover ? (
+              <button
+                type="button"
+                onClick={() => setShowWalkover(true)}
+                className="text-xs text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+              >
+                Registar falta de comparência…
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Qual a dupla que não compareceu?</p>
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    disabled={walkovertLoading}
+                    onClick={() => handleWalkover("team1")}
+                    className="flex-1 min-w-0 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors truncate disabled:opacity-50"
+                  >
+                    {walkovertLoading ? "…" : team1Name}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={walkovertLoading}
+                    onClick={() => handleWalkover("team2")}
+                    className="flex-1 min-w-0 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors truncate disabled:opacity-50"
+                  >
+                    {walkovertLoading ? "…" : team2Name}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowWalkover(false)}
+                    className="text-xs text-slate-400 hover:text-slate-600 transition-colors px-1"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

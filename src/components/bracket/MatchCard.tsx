@@ -75,14 +75,18 @@ export default function MatchCard({ match, isAdmin, onClick, onStart, highlight,
     ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/20"
     : "border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900";
 
+  const isWalkover = isCompleted && !!match.walkover;
+
   function PlayerRow({
     name,
     sets,
     isWinner,
+    isNoShow,
   }: {
     name?: string;
     sets?: number;
     isWinner?: boolean;
+    isNoShow?: boolean;
   }) {
     return (
       <div
@@ -100,7 +104,12 @@ export default function MatchCard({ match, isAdmin, onClick, onStart, highlight,
         >
           {name ?? (isBye ? "—" : "A determinar")}
         </span>
-        {isCompleted && sets !== undefined && (
+        {isNoShow && (
+          <span className="font-mono text-[10px] font-bold ml-2 shrink-0 text-amber-500 dark:text-amber-400">
+            W/O
+          </span>
+        )}
+        {!isNoShow && isCompleted && !isWalkover && sets !== undefined && (
           <span
             className={cn(
               "font-mono text-xs font-bold ml-2 shrink-0",
@@ -149,11 +158,13 @@ export default function MatchCard({ match, isAdmin, onClick, onStart, highlight,
               name={match.team1?.name}
               sets={team1Sets}
               isWinner={isCompleted && match.winnerId === match.team1Id}
+              isNoShow={isWalkover && match.walkover === "team1"}
             />
             <PlayerRow
               name={match.team2?.name}
               sets={team2Sets}
               isWinner={isCompleted && match.winnerId === match.team2Id}
+              isNoShow={isWalkover && match.walkover === "team2"}
             />
           </div>
 

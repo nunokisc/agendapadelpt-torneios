@@ -121,6 +121,7 @@ export interface Match {
   scheduledAt: Date | null;
   court: string | null;
   startedAt: Date | null;
+  walkover: string | null;
   status: MatchStatus;
   nextMatchId: string | null;
   nextMatchSlot: number | null;

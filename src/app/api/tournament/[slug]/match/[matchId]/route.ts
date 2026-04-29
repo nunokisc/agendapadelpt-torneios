@@ -60,33 +60,47 @@ export async function PUT(
   }
 
   const body = await req.json();
-  const parsed = scoreSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
 
-  // Resolve matchFormat: category.matchFormat > tournament.matchFormat > default
-  let resolvedMatchFormat = tournament.matchFormat || "M3SPO";
-  if (match.categoryId) {
-    const category = await prisma.category.findUnique({ where: { id: match.categoryId } });
-    if (category?.matchFormat) resolvedMatchFormat = category.matchFormat;
+  // Walkover path: one team didn't show up
+  let winnerId: string;
+  let loserId: string;
+  let matchData: Record<string, unknown>;
+
+  if (body.walkover === "team1" || body.walkover === "team2") {
+    // walkover = team that did NOT show — the OTHER team wins
+    winnerId = body.walkover === "team1" ? match.team2Id! : match.team1Id!;
+    loserId  = body.walkover === "team1" ? match.team1Id! : match.team2Id!;
+    matchData = { scores: null, winnerId, walkover: body.walkover, status: "completed" };
+  } else {
+    // Normal scored result
+    const parsed = scoreSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+
+    // Resolve matchFormat: category.matchFormat > tournament.matchFormat > default
+    let resolvedMatchFormat = tournament.matchFormat || "M3SPO";
+    if (match.categoryId) {
+      const category = await prisma.category.findUnique({ where: { id: match.categoryId } });
+      if (category?.matchFormat) resolvedMatchFormat = category.matchFormat;
+    }
+    const matchFormat = resolvedMatchFormat as MatchFormat;
+
+    const scores: SetScore[] = parsed.data.scores;
+    const validation = validateScores(scores, matchFormat);
+    if (!validation.valid) return NextResponse.json({ error: validation.error ?? "Resultado inválido" }, { status: 400 });
+
+    const matchWinner = determineMatchWinner(scores, matchFormat);
+    if (!matchWinner) return NextResponse.json({ error: "Resultado ainda não tem vencedor" }, { status: 400 });
+
+    winnerId = matchWinner === 1 ? match.team1Id! : match.team2Id!;
+    loserId  = matchWinner === 1 ? match.team2Id! : match.team1Id!;
+    matchData = { scores: JSON.stringify(scores), winnerId, walkover: null, status: "completed" };
   }
-  const matchFormat = resolvedMatchFormat as MatchFormat;
-
-  const scores: SetScore[] = parsed.data.scores;
-
-  const validation = validateScores(scores, matchFormat);
-  if (!validation.valid) return NextResponse.json({ error: validation.error ?? "Resultado inválido" }, { status: 400 });
-
-  const matchWinner = determineMatchWinner(scores, matchFormat);
-  if (!matchWinner) return NextResponse.json({ error: "Resultado ainda não tem vencedor" }, { status: 400 });
-
-  const winnerId = matchWinner === 1 ? match.team1Id : match.team2Id;
-  const loserId  = matchWinner === 1 ? match.team2Id : match.team1Id;
 
   const result = await prisma.$transaction(async (tx) => {
     // 1. Save the result
     const updatedMatch = await tx.match.update({
       where: { id: matchId },
-      data: { scores: JSON.stringify(scores), winnerId, status: "completed" },
+      data: matchData,
       include: { team1: true, team2: true, winner: true },
     });
 
@@ -410,7 +424,7 @@ export async function DELETE(
     // Reset match to pending
     await tx.match.update({
       where: { id: matchId },
-      data: { status: "pending", scores: null, winnerId: null, startedAt: null },
+      data: { status: "pending", scores: null, winnerId: null, walkover: null, startedAt: null },
     });
 
     // Clear the winner slot from the next knockout match

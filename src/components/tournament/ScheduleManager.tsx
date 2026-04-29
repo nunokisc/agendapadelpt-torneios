@@ -418,7 +418,7 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
           {/* Status */}
           <td className="px-3 py-2.5">
             <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_CLASS[m.status] ?? STATUS_CLASS.pending}`}>
-              {STATUS_LABEL[m.status] ?? m.status}
+              {m.walkover ? "W/O" : (STATUS_LABEL[m.status] ?? m.status)}
             </span>
           </td>
           {/* Actions */}
