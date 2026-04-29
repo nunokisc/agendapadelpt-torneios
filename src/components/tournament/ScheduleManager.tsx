@@ -29,6 +29,11 @@ const STATUS_CLASS: Record<string, string> = {
   completed:   "bg-[#d1fae5]/60 text-[#0E7C66] dark:bg-[#0E7C66]/15 dark:text-[#A3E635]",
 };
 
+const ROW_STATUS_BG: Record<string, string> = {
+  in_progress: "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-900/40",
+  completed:   "bg-emerald-50/70 dark:bg-[#0E7C66]/10 border-emerald-100 dark:border-[#0E7C66]/20",
+};
+
 function todayStr() {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -369,7 +374,11 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
 
     return (
       <>
-        <tr className={`border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors ${isEditing ? "bg-slate-50/80 dark:bg-slate-800/50" : ""}`}>
+        <tr className={`border-b transition-colors ${
+          isEditing
+            ? "bg-slate-50/80 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800"
+            : (ROW_STATUS_BG[m.status] ?? "border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/30")
+        }`}>
           {/* Time */}
           <td className="px-3 py-2.5 text-xs font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
             {m.scheduledAt && showTime ? fmtInterval(m.scheduledAt, tournament.slotMinutes ?? 90) : ""}
