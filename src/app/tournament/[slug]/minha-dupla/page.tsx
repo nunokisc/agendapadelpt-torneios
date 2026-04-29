@@ -29,8 +29,21 @@ function MatchRow({ match, myId, allMatches }: { match: Match; myId: string; all
   const won = match.winnerId === myId;
 
   const scores: SetScore[] = match.scores ? (() => { try { return JSON.parse(match.scores); } catch { return []; } })() : [];
-  const mySets = scores.filter((s) => isTeam1 ? s.team1 > s.team2 : s.team2 > s.team1).length;
-  const theirSets = scores.filter((s) => isTeam1 ? s.team2 > s.team1 : s.team1 > s.team2).length;
+  function setWonBy(s: SetScore): "me" | "them" | null {
+    const myScore = isTeam1 ? s.team1 : s.team2;
+    const theirScore = isTeam1 ? s.team2 : s.team1;
+    if (myScore > theirScore) return "me";
+    if (theirScore > myScore) return "them";
+    if (s.tiebreak) {
+      const myTb = isTeam1 ? s.tiebreak.team1 : s.tiebreak.team2;
+      const theirTb = isTeam1 ? s.tiebreak.team2 : s.tiebreak.team1;
+      if (myTb > theirTb) return "me";
+      if (theirTb > myTb) return "them";
+    }
+    return null;
+  }
+  const mySets = scores.filter((s) => setWonBy(s) === "me").length;
+  const theirSets = scores.filter((s) => setWonBy(s) === "them").length;
 
   const roundLabel = getRoundLabel(match, allMatches);
 
@@ -51,7 +64,11 @@ function MatchRow({ match, myId, allMatches }: { match: Match; myId: string; all
             won ? "bg-[#d1fae5] dark:bg-[#0E7C66]/20 text-[#0E7C66] dark:text-[#A3E635]"
                 : "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
           }`}>
-            {won ? "Vitória" : "Derrota"}
+            {won
+              ? "Vitória"
+              : match.walkover && match.walkover === (isTeam1 ? "team1" : "team2")
+              ? "W/O"
+              : "Derrota"}
           </span>
         )}
         {match.status === "in_progress" && (

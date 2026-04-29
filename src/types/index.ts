@@ -144,4 +144,5 @@ export interface CreateTournamentInput {
   categories?: string[];
   startDate?: string;
   endDate?: string;
+  slotMinutes?: number;
 }

@@ -135,6 +135,8 @@ export async function POST(
 
   // Pre-compute available slots per day window
   const daySlots = days
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date))
     .map((d) => {
       const [sh, sm] = d.startTime.split(":").map(Number);
       const [eh, em] = d.endTime.split(":").map(Number);

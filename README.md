@@ -121,7 +121,7 @@ Os formatos FPP são aliases dos FFT: PRO≡D1, PROPO≡D2, M3S≡B1, M3SPO≡B2
 - **Reset de resultado** — um jogo já concluído pode ter o resultado reposto desde que o jogo seguinte no bracket ainda não tenha resultado; confirmação obrigatória no modal
 - **Início de jogo** — botão "Iniciar jogo" regista `startedAt`; ao submeter o resultado, o sistema calcula o atraso relativamente ao slot agendado e empurra automaticamente os jogos seguintes no mesmo campo (_delay-push_)
 - **Falta de comparência (walkover)** — o admin pode registar no modal que uma dupla não compareceu; a dupla ausente perde por W/O, o score é gerado automaticamente a zero (ex. M3SPO → `6-0, 6-0`; D1 → `9-0`) e o badge **W/O** aparece no cartão de jogo; a dupla faltosa recebe 0 pontos na classificação
-- **Vista pública de resultados** — na vista pública do bracket, clicar num jogo concluído abre um modal de leitura com o resultado set a set, tie-breaks e vencedor; jogos pendentes/em curso não são clicáveis para o público
+- **Vista pública de resultados** — na vista pública (página principal e bracket fullscreen), clicar num jogo concluído abre um modal de leitura com o resultado set a set, tie-breaks e vencedor; jogos pendentes/em curso não são clicáveis para o público
 
 ### Classificação em grupos (Round Robin / Fase de Grupos)
 
@@ -234,6 +234,8 @@ O valor `slotMinutes` definido na criação é herdado pelo agendador automátic
 ### "Os meus jogos"
 - Página `/tournament/[slug]/minha-dupla` — pesquisa por nome (mín. 2 letras) e vê todos os jogos da dupla
 - Secções: Em Curso / Próximos / Concluídos, com resultado, campo e hora
+- Resultado: badge **Vitória** (verde) / **Derrota** (vermelho) / **W/O** (vermelho) quando a dupla faltou
+- Score set-a-set com contagem correcta de sets incluindo tiebreaks (6-6 TB)
 - Pesquisa persiste por torneio em `localStorage`
 - Acessível via bottom nav em mobile
 
@@ -585,6 +587,8 @@ Painel global: `/admin?token=padel-admin-2025`
 
 **Agendamento global**: o `ScheduleManager` recebe `allMatches` (todos os jogos do torneio) e `categories` (todas as séries). O filtro por série (`selectedCats: Set<string>`) é um estado local do componente — não afecta os dados, só o que é apresentado e o scope do auto-agendamento/reset. A tab "Horário"/"Agenda" é renderizada ao nível do torneio, acima das tabs de série.
 
+**Agendamento automático — ordenação de dias**: os dias fornecidos pelo admin são ordenados por data (`YYYY-MM-DD`) antes de serem processados, garantindo que dias fora de ordem não produzem horários incorrectos.
+
 **Prevenção de conflitos no agendamento automático**: o auto-agendador rastreia dois recursos em paralelo para cada slot:
 1. `courtNextFreeMs` — quando cada campo fica livre
 2. `teamNextFreeMs` — quando cada dupla fica disponível (por `team1Id`/`team2Id`)
@@ -613,7 +617,7 @@ Para cada jogo a agendar, o `notBefore = max(courtFree, team1Free, team2Free)`. 
 
 **Formatos de jogo (scoring)**: `src/lib/scoring.ts` é a fonte de verdade para toda a lógica de validação e determinação de vencedor. Os formatos FPP (PRO, PROPO, M3S, M3SPO, M3, M3PO) são aliases dos FFT equivalentes — `getFormatStructure` delega para o formato FFT correspondente. A detecção do Super Tie-Break é feita por `structure[i].type === "superTiebreak"`, nunca por nome de formato. `buildWalkoverScores(format, winnerSide)` gera o score de W/O para um dado formato: cada set não-condicional fica com `maxGames-0` (ex. M3SPO → `[{team1:6,team2:0},{team1:6,team2:0}]`; D1 → `[{team1:9,team2:0}]`; E → `[{team1:10,team2:0,superTiebreak:true}]`).
 
-**Standings (classificação de grupos)**: `computeGroupStandings` em `src/lib/standings.ts` é a única fonte de verdade — usada pela tabela visual (`RoundRobinTable`), pela página de estatísticas e pelo servidor ao avançar jogadores para o knockout. Sistema de pontos: vitória=3, derrota normal=1, derrota por W/O=0. Critérios de ordenação: pontos → vitórias → saldo sets → saldo jogos → h2h wins → saldo jogos h2h. Jogos por walkover sem scores (dados legados) são aceites — contabilizam win/loss/pts mas sem set/game data.
+**Standings (classificação de grupos)**: `computeGroupStandings` em `src/lib/standings.ts` é a única fonte de verdade — usada pela tabela visual (`RoundRobinTable`), pela página de estatísticas e pelo servidor ao avançar jogadores para o knockout. Sistema de pontos: vitória=3, derrota normal=1, derrota por W/O=0. Critérios de ordenação: pontos → vitórias → saldo sets → saldo jogos → h2h wins → saldo jogos h2h. O saldo de sets trata correctamente sets empatados com tie-break (ex. 6-6 TB 7-5): o set é atribuído ao lado que ganhou o tie-break, não ao lado "else". Jogos por walkover sem scores (dados legados) são aceites — contabilizam win/loss/pts mas sem set/game data.
 
 **Formato FPP automático (`fpp_auto`)**: o formato é apenas uma etiqueta guardada no torneio. O sistema de grupos (1, 2 ou 3 grupos, ou eliminação directa) é determinado em `src/lib/fpp-bracket.ts → getFPPConfig(playerCount)` **no momento de gerar o bracket**, quando o número de duplas confirmadas é conhecido. O seeding cross-grupo (`fppKnockoutOrder`) garante que nenhum par do mesmo grupo se cruza na primeira ronda do knockout.
 
@@ -624,6 +628,18 @@ Para cada jogo a agendar, o `notBefore = max(courtFree, team1Free, team2Free)`. 
 **Séries/Categorias**: cada série tem os seus próprios `Player[]` e `Match[]`. A geração do bracket aceita `categoryId` no body e actua apenas sobre essa série. O `category.status` transita para `in_progress` ao gerar e para `completed` quando todos os jogos da série terminam. O `tournament.status` só passa a `completed` quando todas as séries estão concluídas. Torneios existentes sem séries têm uma categoria `OPEN` criada pela migração `20260427_categories` — todo o código legado continua a funcionar sem alterações.
 
 **Clone com séries**: o clone remapeia os `categoryId` de todos os jogadores para os IDs das novas categorias clonadas, usando um mapa `oldId → newId` construído durante a transacção.
+
+**SSE — eventos em tempo real**: cada acção no match emite um evento SSE distinto para que o hook `useTournamentSSE` mostre a notificação correcta:
+
+| Acção | Evento SSE | Notificação push |
+|-------|-----------|-----------------|
+| Submeter resultado / W/O | `match_completed` | "Resultado registado" |
+| Iniciar jogo (▶ Iniciar) | `match_started` | "Jogo iniciado" |
+| Repor resultado | `match_reset` | "Resultado reposto" |
+| Gerar bracket | `bracket_generated` | "Bracket gerado" |
+| Actualizar torneio | `tournament_updated` | — |
+
+O evento legado `match_updated` continua a ser ouvido silenciosamente para compatibilidade com clientes ligados durante um deploy.
 
 **SSR e localStorage**: componentes que dependem de `localStorage` usam um estado `ready` inicializado a `false` para evitar hydration mismatch.
 
