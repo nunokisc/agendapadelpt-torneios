@@ -202,6 +202,26 @@ export function determineMatchWinner(scores: SetScore[], format: MatchFormat): 1
 }
 
 /**
+ * Build the walkover score for a given format.
+ * The absent side gets 0 in every non-conditional set; the winner gets the max score.
+ */
+export function buildWalkoverScores(format: MatchFormat, winnerSide: 1 | 2): SetScore[] {
+  const structure = getFormatStructure(format);
+  return structure
+    .filter((s) => !s.conditional)
+    .map((s) => {
+      if (s.type === "superTiebreak") {
+        const target = s.superTiebreakTarget ?? 10;
+        return winnerSide === 1
+          ? { team1: target, team2: 0, superTiebreak: true as const }
+          : { team1: 0, team2: target, superTiebreak: true as const };
+      }
+      const maxGames = s.maxGames ?? 6;
+      return winnerSide === 1 ? { team1: maxGames, team2: 0 } : { team1: 0, team2: maxGames };
+    });
+}
+
+/**
  * Validate a complete set of scores against the format rules.
  */
 export function validateScores(scores: SetScore[], format: MatchFormat): { valid: boolean; error?: string } {

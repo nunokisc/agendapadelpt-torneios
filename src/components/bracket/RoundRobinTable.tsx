@@ -19,6 +19,7 @@ interface Standing {
   played: number;
   wins: number;
   losses: number;
+  points: number;
   setsFor: number;
   setsAgainst: number;
   gamesFor: number;
@@ -47,6 +48,7 @@ export default function RoundRobinTable({ matches, players, isAdmin, onMatchClic
           played: s.played,
           wins: s.wins,
           losses: s.losses,
+          points: s.points,
           setsFor: s.setsFor,
           setsAgainst: s.setsAgainst,
           gamesFor: s.gamesFor,
@@ -73,6 +75,7 @@ export default function RoundRobinTable({ matches, players, isAdmin, onMatchClic
               <th className="py-2 px-2 text-center" title="Jogos disputados">J</th>
               <th className="py-2 px-2 text-center" title="Vitórias">V</th>
               <th className="py-2 px-2 text-center" title="Derrotas">D</th>
+              <th className="py-2 px-2 text-center font-bold" title="Pontos">Pts</th>
               <th className="py-2 px-2 text-center" title="Sets ganhos">SG</th>
               <th className="py-2 px-2 text-center" title="Sets perdidos">SP</th>
               <th className="py-2 px-2 text-center" title="Saldo de sets">SS</th>
@@ -94,6 +97,7 @@ export default function RoundRobinTable({ matches, players, isAdmin, onMatchClic
                 <td className="py-2 px-2 text-center text-slate-500 dark:text-slate-400">{s.played}</td>
                 <td className="py-2 px-2 text-center text-[#0E7C66] dark:text-[#A3E635] font-bold">{s.wins}</td>
                 <td className="py-2 px-2 text-center text-red-500">{s.losses}</td>
+                <td className="py-2 px-2 text-center font-bold text-slate-800 dark:text-slate-100">{s.points}</td>
                 <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{s.setsFor}</td>
                 <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{s.setsAgainst}</td>
                 <td className="py-2 px-2 text-center font-medium text-slate-700 dark:text-slate-300">

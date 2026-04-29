@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { scoreSchema } from "@/lib/validators";
-import { determineMatchWinner, validateScores } from "@/lib/scoring";
+import { determineMatchWinner, validateScores, buildWalkoverScores } from "@/lib/scoring";
 import { generateSingleElimination } from "@/lib/bracket-engine";
 import { computeGroupStandings } from "@/lib/standings";
 import { fppKnockoutOrder } from "@/lib/fpp-bracket";
@@ -70,7 +70,16 @@ export async function PUT(
     // walkover = team that did NOT show — the OTHER team wins
     winnerId = body.walkover === "team1" ? match.team2Id! : match.team1Id!;
     loserId  = body.walkover === "team1" ? match.team1Id! : match.team2Id!;
-    matchData = { scores: null, winnerId, walkover: body.walkover, status: "completed" };
+
+    // Resolve format to generate the walkover score (absent side goes to 0 in all sets)
+    let resolvedFmt = tournament.matchFormat || "M3SPO";
+    if (match.categoryId) {
+      const cat = await prisma.category.findUnique({ where: { id: match.categoryId } });
+      if (cat?.matchFormat) resolvedFmt = cat.matchFormat;
+    }
+    const winnerSide: 1 | 2 = body.walkover === "team1" ? 2 : 1;
+    const woScores = buildWalkoverScores(resolvedFmt as MatchFormat, winnerSide);
+    matchData = { scores: JSON.stringify(woScores), winnerId, walkover: body.walkover, status: "completed" };
   } else {
     // Normal scored result
     const parsed = scoreSchema.safeParse(body);
@@ -180,7 +189,7 @@ export async function PUT(
 
       const allGroupMatches = await tx.match.findMany({
         where: { ...categoryFilter, bracketType: "group" },
-        select: { status: true, team1Id: true, team2Id: true, winnerId: true, scores: true, groupIndex: true },
+        select: { status: true, team1Id: true, team2Id: true, winnerId: true, scores: true, groupIndex: true, walkover: true },
       });
 
       const allGroupDone = allGroupMatches.every(

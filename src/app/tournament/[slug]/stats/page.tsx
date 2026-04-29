@@ -16,6 +16,7 @@ interface TeamStat {
   played: number;
   wins: number;
   losses: number;
+  points: number;
   setsFor: number;
   setsAgainst: number;
   gamesFor: number;
@@ -26,12 +27,13 @@ interface TeamStat {
 function computeStats(matches: Match[], players: Player[]): TeamStat[] {
   const map = new Map<string, TeamStat>();
   for (const p of players) {
-    map.set(p.id, { player: p, played: 0, wins: 0, losses: 0, setsFor: 0, setsAgainst: 0, gamesFor: 0, gamesAgainst: 0, winPct: 0 });
+    map.set(p.id, { player: p, played: 0, wins: 0, losses: 0, points: 0, setsFor: 0, setsAgainst: 0, gamesFor: 0, gamesAgainst: 0, winPct: 0 });
   }
 
   for (const m of matches) {
-    if (m.status !== "completed" || !m.team1Id || !m.team2Id || !m.scores) continue;
-    const scores: SetScore[] = JSON.parse(m.scores);
+    if (m.status !== "completed" || !m.team1Id || !m.team2Id) continue;
+    if (!m.scores && !m.walkover) continue;
+    const scores: SetScore[] = m.scores ? JSON.parse(m.scores) : [];
     let s1 = 0, s2 = 0, g1 = 0, g2 = 0;
     for (const s of scores) {
       if (s.team1 > s.team2) s1++;
@@ -42,17 +44,20 @@ function computeStats(matches: Match[], players: Player[]): TeamStat[] {
       }
       g1 += s.team1; g2 += s.team2;
     }
+    const isWalkover = !!m.walkover;
     const t1 = map.get(m.team1Id);
     const t2 = map.get(m.team2Id);
     if (t1) {
       t1.played++;
-      if (m.winnerId === m.team1Id) t1.wins++; else t1.losses++;
+      if (m.winnerId === m.team1Id) { t1.wins++; t1.points += 3; }
+      else { t1.losses++; t1.points += isWalkover && m.walkover === "team1" ? 0 : 1; }
       t1.setsFor += s1; t1.setsAgainst += s2;
       t1.gamesFor += g1; t1.gamesAgainst += g2;
     }
     if (t2) {
       t2.played++;
-      if (m.winnerId === m.team2Id) t2.wins++; else t2.losses++;
+      if (m.winnerId === m.team2Id) { t2.wins++; t2.points += 3; }
+      else { t2.losses++; t2.points += isWalkover && m.walkover === "team2" ? 0 : 1; }
       t2.setsFor += s2; t2.setsAgainst += s1;
       t2.gamesFor += g2; t2.gamesAgainst += g1;
     }
@@ -61,7 +66,7 @@ function computeStats(matches: Match[], players: Player[]): TeamStat[] {
   return Array.from(map.values())
     .map((s) => ({ ...s, winPct: s.played > 0 ? Math.round((s.wins / s.played) * 100) : 0 }))
     .filter((s) => s.played > 0)
-    .sort((a, b) => b.wins - a.wins || b.winPct - a.winPct || (b.setsFor - b.setsAgainst) - (a.setsFor - a.setsAgainst));
+    .sort((a, b) => b.points - a.points || b.wins - a.wins || (b.setsFor - b.setsAgainst) - (a.setsFor - a.setsAgainst));
 }
 
 export default function StatsPage() {
@@ -129,6 +134,7 @@ export default function StatsPage() {
                   <th className="text-center py-2 px-2" title="Jogos disputados">J</th>
                   <th className="text-center py-2 px-2" title="Vitórias">V</th>
                   <th className="text-center py-2 px-2" title="Derrotas">D</th>
+                  <th className="text-center py-2 px-2 font-bold" title="Pontos">Pts</th>
                   <th className="text-center py-2 px-2" title="Sets ganhos">SG</th>
                   <th className="text-center py-2 px-2" title="Sets perdidos">SP</th>
                   <th className="text-center py-2 px-2" title="Saldo de sets">SS</th>
@@ -150,6 +156,7 @@ export default function StatsPage() {
                     <td className="py-2.5 px-2 text-center text-slate-500 dark:text-slate-400 font-mono">{s.played}</td>
                     <td className="py-2.5 px-2 text-center text-[#0E7C66] dark:text-[#A3E635] font-bold">{s.wins}</td>
                     <td className="py-2.5 px-2 text-center text-red-500 font-mono">{s.losses}</td>
+                    <td className="py-2.5 px-2 text-center font-bold text-slate-800 dark:text-slate-100">{s.points}</td>
                     <td className="py-2.5 px-2 text-center text-slate-600 dark:text-slate-400">{s.setsFor}</td>
                     <td className="py-2.5 px-2 text-center text-slate-600 dark:text-slate-400">{s.setsAgainst}</td>
                     <td className="py-2.5 px-2 text-center font-medium text-slate-700 dark:text-slate-300">
