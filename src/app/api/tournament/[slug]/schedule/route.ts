@@ -26,8 +26,8 @@ const autoScheduleSchema = z.object({
 });
 
 const resetSchema = z.object({
-  // Optional: restrict reset to a specific category ID
-  categoryId: z.string().optional(),
+  // Optional: restrict reset to specific category IDs
+  categoryIds: z.array(z.string()).optional(),
 });
 
 // PATCH: manual single-match scheduling
@@ -266,11 +266,12 @@ export async function DELETE(
   const parsed = resetSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
 
+  const { categoryIds } = parsed.data;
   const result = await prisma.match.updateMany({
     where: {
       tournamentId: tournament.id,
       status: { notIn: ["completed", "in_progress", "bye"] },
-      ...(parsed.data.categoryId ? { categoryId: parsed.data.categoryId } : {}),
+      ...(categoryIds && categoryIds.length > 0 ? { categoryId: { in: categoryIds } } : {}),
     },
     data: { court: null, scheduledAt: null },
   });

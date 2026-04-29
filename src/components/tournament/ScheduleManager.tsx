@@ -217,8 +217,16 @@ function EditPanel({ match, slug, token, slotMinutes, allMatches, onSaved, onCan
 export default function ScheduleManager({ tournament, allMatches, categories, token, isAdmin, onUpdate }: Props) {
   const { toast } = useToast();
   const hasMultipleCategories = categories.length > 1;
-  const [activeCatFilter, setActiveCatFilter] = useState<string>("all");
+  const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  function toggleCat(code: string) {
+    setSelectedCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code); else next.add(code);
+      return next;
+    });
+  }
 
   // Auto-schedule form
   const [showAuto, setShowAuto] = useState(false);
@@ -243,10 +251,12 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
   );
 
   const filtered = useMemo(() => {
-    if (activeCatFilter === "all") return playable;
-    const cat = categories.find((c) => c.code === activeCatFilter);
-    return cat ? playable.filter((m) => m.categoryId === cat.id) : playable;
-  }, [playable, activeCatFilter, categories]);
+    if (selectedCats.size === 0) return playable;
+    const catIds = new Set(
+      categories.filter((c) => selectedCats.has(c.code)).map((c) => c.id)
+    );
+    return playable.filter((m) => m.categoryId && catIds.has(m.categoryId));
+  }, [playable, selectedCats, categories]);
 
   // Split into scheduled (grouped by date) and unscheduled
   const { byDate, unscheduled } = useMemo(() => {
@@ -298,12 +308,12 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
       setDays(buildDaysFromRange(new Date(tournament.startDate), new Date(tournament.endDate)));
   }
 
-  // Resolve active category IDs for the current filter
+  // Resolve active category IDs for the current filter (undefined = no filter = all)
   const activeCategoryIds = useMemo(() => {
-    if (activeCatFilter === "all") return undefined;
-    const cat = categories.find((c) => c.code === activeCatFilter);
-    return cat ? [cat.id] : undefined;
-  }, [activeCatFilter, categories]);
+    if (selectedCats.size === 0) return undefined;
+    const ids = categories.filter((c) => selectedCats.has(c.code)).map((c) => c.id);
+    return ids.length > 0 ? ids : undefined;
+  }, [selectedCats, categories]);
 
   async function autoSchedule() {
     setAutoLoading(true);
@@ -317,7 +327,7 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
       });
       if (!res.ok) throw new Error((await res.json()).error);
       const data = await res.json();
-      const label = activeCatFilter !== "all" ? ` (${activeCatFilter})` : "";
+      const label = selectedCats.size > 0 ? ` (${Array.from(selectedCats).join(", ")})` : "";
       toast(`${data.updated} jogos agendados automaticamente${label}!`);
       setShowAuto(false);
       onUpdate();
@@ -329,12 +339,12 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
   }
 
   async function resetSchedule() {
-    const label = activeCatFilter !== "all" ? `a série ${activeCatFilter}` : "todo o torneio";
+    const label = selectedCats.size > 0 ? `${Array.from(selectedCats).join(", ")}` : "todo o torneio";
     if (!confirm(`Apagar o agendamento de ${label}? Os resultados não são afectados.`)) return;
     setResetLoading(true);
     try {
       const body: Record<string, unknown> = {};
-      if (activeCategoryIds) body.categoryId = activeCategoryIds[0];
+      if (activeCategoryIds) body.categoryIds = activeCategoryIds;
       const res = await fetch(`/api/tournament/${tournament.slug}/schedule?token=${token}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -502,7 +512,9 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
           <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">Horário do Torneio</h2>
           <p className="text-xs text-slate-400 mt-0.5">
             {courts} campo{courts !== 1 ? "s" : ""} · {scheduledCount} de {filtered.length} jogos agendados
-            {activeCatFilter !== "all" && <span className="ml-1 text-[#0E7C66] dark:text-[#A3E635]">· {activeCatFilter}</span>}
+            {selectedCats.size > 0 && (
+              <span className="ml-1 text-[#0E7C66] dark:text-[#A3E635]">· {Array.from(selectedCats).join(", ")}</span>
+            )}
           </p>
         </div>
         {isAdmin && (
@@ -517,7 +529,7 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
               onClick={resetSchedule}
               disabled={resetLoading}
               className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-red-500 hover:border-red-300 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors disabled:opacity-50"
-              title={activeCatFilter !== "all" ? `Limpar agendamento de ${activeCatFilter}` : "Limpar todo o agendamento"}
+              title={selectedCats.size > 0 ? `Limpar agendamento de ${Array.from(selectedCats).join(", ")}` : "Limpar todo o agendamento"}
             >
               {resetLoading ? "A limpar…" : "Limpar agenda"}
             </button>
@@ -525,32 +537,35 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
         )}
       </div>
 
-      {/* Category filter chips */}
+      {/* Category filter chips (multi-select) */}
       {hasMultipleCategories && (
         <div className="flex gap-1.5 flex-wrap">
           <button
-            onClick={() => setActiveCatFilter("all")}
+            onClick={() => setSelectedCats(new Set())}
             className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-              activeCatFilter === "all"
+              selectedCats.size === 0
                 ? "bg-[#d1fae5] text-[#0E7C66] dark:bg-[#0E7C66]/20 dark:text-[#A3E635] ring-1 ring-[#0E7C66]"
                 : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
             }`}
           >
             Todas
           </button>
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCatFilter(cat.code)}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                activeCatFilter === cat.code
-                  ? "bg-[#d1fae5] text-[#0E7C66] dark:bg-[#0E7C66]/20 dark:text-[#A3E635] ring-1 ring-[#0E7C66]"
-                  : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-              }`}
-            >
-              {cat.code}
-            </button>
-          ))}
+          {categories.map((cat) => {
+            const active = selectedCats.has(cat.code);
+            return (
+              <button
+                key={cat.id}
+                onClick={() => toggleCat(cat.code)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-[#d1fae5] text-[#0E7C66] dark:bg-[#0E7C66]/20 dark:text-[#A3E635] ring-1 ring-[#0E7C66]"
+                    : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                }`}
+              >
+                {cat.code}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -559,8 +574,8 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
         <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-xs text-slate-500">
-              {activeCatFilter !== "all"
-                ? <>Agenda os jogos de <strong>{activeCatFilter}</strong> (sem hora marcada) pelos {courts} campo{courts !== 1 ? "s" : ""}.</>
+              {selectedCats.size > 0
+                ? <>Agenda os jogos de <strong>{Array.from(selectedCats).join(", ")}</strong> (sem hora marcada) pelos {courts} campo{courts !== 1 ? "s" : ""}.</>
                 : <>Agenda todos os jogos sem hora marcada pelos {courts} campo{courts !== 1 ? "s" : ""}.</>}
             </p>
             {tournament.startDate && tournament.endDate && (
