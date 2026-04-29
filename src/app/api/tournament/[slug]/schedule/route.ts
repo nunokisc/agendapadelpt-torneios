@@ -9,7 +9,6 @@ const scheduleSchema = z.object({
   scheduledAt: z.string().datetime().nullable().optional(),
 });
 
-// Bulk auto-assign: distribute matches across courts within day time windows
 const autoScheduleSchema = z.object({
   days: z
     .array(
@@ -22,8 +21,16 @@ const autoScheduleSchema = z.object({
     .min(1)
     .max(30),
   minutesPerMatch: z.number().int().min(15).max(240).default(90),
+  // Optional: restrict scheduling to specific category IDs
+  categoryIds: z.array(z.string()).optional(),
 });
 
+const resetSchema = z.object({
+  // Optional: restrict reset to a specific category ID
+  categoryId: z.string().optional(),
+});
+
+// PATCH: manual single-match scheduling
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -60,7 +67,7 @@ export async function PATCH(
   return NextResponse.json({ match: updated });
 }
 
-// POST: auto-schedule all matches across available courts
+// POST: auto-schedule unscheduled matches across available courts
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -70,12 +77,7 @@ export async function POST(
 
   const tournament = await prisma.tournament.findUnique({
     where: { slug },
-    include: {
-      matches: {
-        where: { status: { notIn: ["bye", "completed", "in_progress"] } },
-        orderBy: [{ round: "asc" }, { position: "asc" }],
-      },
-    },
+    select: { id: true, adminToken: true, courtCount: true, slotMinutes: true, scheduleDays: true },
   });
   if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
   if (tournament.adminToken !== token) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
@@ -84,9 +86,20 @@ export async function POST(
   const parsed = autoScheduleSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
 
+  const { days, minutesPerMatch, categoryIds } = parsed.data;
   const courts = tournament.courtCount ?? 1;
-  const { days, minutesPerMatch } = parsed.data;
   const msPerMatch = minutesPerMatch * 60 * 1000;
+
+  // Fetch only pending, unscheduled matches (skip already-scheduled ones)
+  const pendingMatches = await prisma.match.findMany({
+    where: {
+      tournamentId: tournament.id,
+      status: { notIn: ["bye", "completed", "in_progress"] },
+      scheduledAt: null,
+      ...(categoryIds && categoryIds.length > 0 ? { categoryId: { in: categoryIds } } : {}),
+    },
+    orderBy: [{ round: "asc" }, { position: "asc" }],
+  });
 
   // Pre-compute available slots per day window
   const daySlots = days
@@ -103,18 +116,11 @@ export async function POST(
     return NextResponse.json({ error: "Nenhuma janela horária tem capacidade para pelo menos um jogo" }, { status: 400 });
   }
 
-  // Phase ordering: group stage must come entirely before knockout phases.
-  // Round numbers restart at 1 per bracketType, so we sort by phase first.
   const PHASE_ORDER: Record<string, number> = {
-    group: 0,
-    winners: 1,
-    losers: 2,
-    third_place: 3,
-    final: 4,
+    group: 0, winners: 1, losers: 2, third_place: 3, final: 4,
   };
 
-  // Flatten matches: phase → round → groupIndex → position
-  const allMatches = [...tournament.matches].sort((a, b) => {
+  const allMatches = [...pendingMatches].sort((a, b) => {
     const pa = PHASE_ORDER[a.bracketType] ?? 99;
     const pb = PHASE_ORDER[b.bracketType] ?? 99;
     if (pa !== pb) return pa - pb;
@@ -125,14 +131,12 @@ export async function POST(
     return a.position - b.position;
   });
 
-  // ── Per-court pointer initialisation ──────────────────────────────────────
-  // Find the latest occupied end time on each court among already-completed /
-  // in-progress matches so that newly-scheduled slots start AFTER them.
+  // Per-court pointer: start after any already-scheduled match on each court
   const existingScheduled = await prisma.match.findMany({
     where: {
       tournamentId: tournament.id,
       scheduledAt: { not: null },
-      status: { in: ["completed", "in_progress"] },
+      status: { in: ["completed", "in_progress", "pending"] },
     },
     select: { court: true, scheduledAt: true },
   });
@@ -146,7 +150,6 @@ export async function POST(
     }
   }
 
-  // Default start = day 0 start; push forward per court if existing matches exist
   const [y0, m0, d0] = daySlots[0].date.split("-").map(Number);
   const day0StartMs = new Date(y0, m0 - 1, d0, daySlots[0].startHour, daySlots[0].startMin).getTime();
 
@@ -156,23 +159,18 @@ export async function POST(
     courtNextFreeMs[name] = Math.max(day0StartMs, courtLastEndMs[name] ?? 0);
   }
 
-  // Returns the first slot-boundary time within daySlots that is >= notBeforeMs,
-  // or null if all day windows are exhausted.
   function nextSlotAfter(notBeforeMs: number): Date | null {
     for (const d of daySlots) {
       const [year, month, day] = d.date.split("-").map(Number);
       const dayStartMs = new Date(year, month - 1, day, d.startHour, d.startMin).getTime();
       const dayEndMs = dayStartMs + d.slots * msPerMatch;
-
-      if (notBeforeMs >= dayEndMs) continue; // this entire day is already past
-
-      // Round up to the next whole slot boundary within this day
+      if (notBeforeMs >= dayEndMs) continue;
       const slotOffset = Math.max(0, Math.ceil((notBeforeMs - dayStartMs) / msPerMatch));
       if (slotOffset < d.slots) {
         return new Date(dayStartMs + slotOffset * msPerMatch);
       }
     }
-    return null; // all windows exhausted
+    return null;
   }
 
   const updates: { id: string; court: string; scheduledAt: Date }[] = [];
@@ -180,20 +178,15 @@ export async function POST(
   allMatches.forEach((m, i) => {
     const courtName = `Campo ${(i % courts) + 1}`;
     const scheduledAt = nextSlotAfter(courtNextFreeMs[courtName]);
-    if (!scheduledAt) return; // overflows all day windows — skip
-
+    if (!scheduledAt) return;
     courtNextFreeMs[courtName] = scheduledAt.getTime() + msPerMatch;
     updates.push({ id: m.id, court: courtName, scheduledAt });
   });
 
   await prisma.$transaction([
-    // Persist schedule config on tournament for delay-push use
     prisma.tournament.update({
       where: { id: tournament.id },
-      data: {
-        slotMinutes: minutesPerMatch,
-        scheduleDays: JSON.stringify(days),
-      },
+      data: { slotMinutes: minutesPerMatch, scheduleDays: JSON.stringify(days) },
     }),
     ...updates.map((u) =>
       prisma.match.update({
@@ -204,4 +197,32 @@ export async function POST(
   ]);
 
   return NextResponse.json({ updated: updates.length });
+}
+
+// DELETE: reset schedule (clear court + scheduledAt) for pending matches
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  const { slug } = await params;
+  const token = extractAdminToken(req, slug);
+
+  const tournament = await prisma.tournament.findUnique({ where: { slug } });
+  if (!tournament) return NextResponse.json({ error: "Torneio não encontrado" }, { status: 404 });
+  if (tournament.adminToken !== token) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
+
+  const body = await req.json().catch(() => ({}));
+  const parsed = resetSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+
+  const result = await prisma.match.updateMany({
+    where: {
+      tournamentId: tournament.id,
+      status: { notIn: ["completed", "in_progress", "bye"] },
+      ...(parsed.data.categoryId ? { categoryId: parsed.data.categoryId } : {}),
+    },
+    data: { court: null, scheduledAt: null },
+  });
+
+  return NextResponse.json({ cleared: result.count });
 }

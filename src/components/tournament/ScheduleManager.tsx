@@ -62,7 +62,7 @@ function buildDaysFromRange(start: Date, end: Date): DayWindow[] {
   const cur = new Date(start); cur.setHours(0, 0, 0, 0);
   const fin = new Date(end);   fin.setHours(0, 0, 0, 0);
   while (cur <= fin) {
-    days.push({ date: dateToStr(cur), startTime: "09:00", endTime: "20:00" });
+    days.push({ date: dateToStr(cur), startTime: "09:00", endTime: "23:59" });
     cur.setDate(cur.getDate() + 1);
   }
   return days;
@@ -148,10 +148,11 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
     if (tournament.startDate && tournament.endDate) {
       return buildDaysFromRange(new Date(tournament.startDate), new Date(tournament.endDate));
     }
-    return [{ date: todayStr(), startTime: "09:00", endTime: "20:00" }];
+    return [{ date: todayStr(), startTime: "09:00", endTime: "23:59" }];
   });
   const [minutesPerMatch, setMinutesPerMatch] = useState(tournament.slotMinutes ?? 90);
   const [autoLoading, setAutoLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   const categoryMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -219,23 +220,56 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
       setDays(buildDaysFromRange(new Date(tournament.startDate), new Date(tournament.endDate)));
   }
 
+  // Resolve active category IDs for the current filter
+  const activeCategoryIds = useMemo(() => {
+    if (activeCatFilter === "all") return undefined;
+    const cat = categories.find((c) => c.code === activeCatFilter);
+    return cat ? [cat.id] : undefined;
+  }, [activeCatFilter, categories]);
+
   async function autoSchedule() {
     setAutoLoading(true);
     try {
+      const body: Record<string, unknown> = { days, minutesPerMatch };
+      if (activeCategoryIds) body.categoryIds = activeCategoryIds;
       const res = await fetch(`/api/tournament/${tournament.slug}/schedule?token=${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ days, minutesPerMatch }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error((await res.json()).error);
       const data = await res.json();
-      toast(`${data.updated} jogos agendados automaticamente!`);
+      const label = activeCatFilter !== "all" ? ` (${activeCatFilter})` : "";
+      toast(`${data.updated} jogos agendados automaticamente${label}!`);
       setShowAuto(false);
       onUpdate();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Erro no agendamento automático");
     } finally {
       setAutoLoading(false);
+    }
+  }
+
+  async function resetSchedule() {
+    const label = activeCatFilter !== "all" ? `a série ${activeCatFilter}` : "todo o torneio";
+    if (!confirm(`Apagar o agendamento de ${label}? Os resultados não são afectados.`)) return;
+    setResetLoading(true);
+    try {
+      const body: Record<string, unknown> = {};
+      if (activeCategoryIds) body.categoryId = activeCategoryIds[0];
+      const res = await fetch(`/api/tournament/${tournament.slug}/schedule?token=${token}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      const data = await res.json();
+      toast(`Agendamento limpo (${data.cleared} jogos).`);
+      onUpdate();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Erro ao limpar agendamento");
+    } finally {
+      setResetLoading(false);
     }
   }
 
@@ -384,15 +418,26 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
           <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">Horário do Torneio</h2>
           <p className="text-xs text-slate-400 mt-0.5">
             {courts} campo{courts !== 1 ? "s" : ""} · {scheduledCount} de {filtered.length} jogos agendados
+            {activeCatFilter !== "all" && <span className="ml-1 text-[#0E7C66] dark:text-[#A3E635]">· {activeCatFilter}</span>}
           </p>
         </div>
         {isAdmin && (
-          <button
-            onClick={() => setShowAuto((v) => !v)}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${showAuto ? "border-[#0E7C66] text-[#0E7C66] bg-[#d1fae5]/30 dark:bg-[#0E7C66]/10 dark:text-[#A3E635]" : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-[#0E7C66] hover:text-[#0E7C66] dark:hover:text-[#A3E635]"}`}
-          >
-            Agendar automaticamente
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAuto((v) => !v)}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${showAuto ? "border-[#0E7C66] text-[#0E7C66] bg-[#d1fae5]/30 dark:bg-[#0E7C66]/10 dark:text-[#A3E635]" : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-[#0E7C66] hover:text-[#0E7C66] dark:hover:text-[#A3E635]"}`}
+            >
+              Agendar automaticamente
+            </button>
+            <button
+              onClick={resetSchedule}
+              disabled={resetLoading}
+              className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-red-500 hover:border-red-300 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors disabled:opacity-50"
+              title={activeCatFilter !== "all" ? `Limpar agendamento de ${activeCatFilter}` : "Limpar todo o agendamento"}
+            >
+              {resetLoading ? "A limpar…" : "Limpar agenda"}
+            </button>
+          </div>
         )}
       </div>
 
@@ -430,7 +475,9 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
         <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-xs text-slate-500">
-              Distribui todos os jogos pelos {courts} campo{courts !== 1 ? "s" : ""} pelas janelas horárias definidas.
+              {activeCatFilter !== "all"
+                ? <>Agenda os jogos de <strong>{activeCatFilter}</strong> (sem hora marcada) pelos {courts} campo{courts !== 1 ? "s" : ""}.</>
+                : <>Agenda todos os jogos sem hora marcada pelos {courts} campo{courts !== 1 ? "s" : ""}.</>}
             </p>
             {tournament.startDate && tournament.endDate && (
               <button
