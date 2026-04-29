@@ -424,7 +424,7 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
           {/* Actions */}
           <td className="px-3 py-2.5 whitespace-nowrap">
             <div className="flex items-center gap-2 justify-end">
-              {whatsappHref && (
+              {isAdmin && whatsappHref && (
                 <a
                   href={whatsappHref}
                   target="_blank"
