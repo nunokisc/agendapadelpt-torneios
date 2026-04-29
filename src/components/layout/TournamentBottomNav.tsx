@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// ── Icons ──────────────────────────────────────────────────────────────────────
-
 function IconBracket() {
   return (
     <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -32,41 +30,79 @@ function IconStats() {
   );
 }
 
-// ── Component ──────────────────────────────────────────────────────────────────
+function IconCalendar() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="4" width="18" height="18" rx="2" /><path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  );
+}
 
 interface Props {
   slug: string;
+  activeTab?: "bracket" | "schedule";
+  onTabChange?: (tab: "bracket" | "schedule") => void;
 }
 
-export default function TournamentBottomNav({ slug }: Props) {
+export default function TournamentBottomNav({ slug, activeTab = "bracket", onTabChange }: Props) {
   const pathname = usePathname();
   const base = `/tournament/${slug}`;
 
-  const items = [
-    { href: base, label: "Bracket", icon: <IconBracket />, match: (p: string) => p === base },
-    { href: `${base}/minha-dupla`, label: "Os meus jogos", icon: <IconPerson />, match: (p: string) => p.startsWith(`${base}/minha-dupla`) },
-    { href: `${base}/stats`, label: "Estatísticas", icon: <IconStats />, match: (p: string) => p.startsWith(`${base}/stats`) },
-  ];
+  const isOnBase = pathname === base;
 
   return (
     <nav className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex safe-bottom">
-      {items.map(({ href, label, icon, match }) => {
-        const active = match(pathname);
-        return (
-          <Link
-            key={href}
-            href={href}
-            className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
-              active
-                ? "text-[#0E7C66] dark:text-[#A3E635]"
-                : "text-slate-400 dark:text-slate-500"
-            }`}
-          >
-            {icon}
-            {label}
-          </Link>
-        );
-      })}
+      {/* Bracket tab — switches to bracket view on the main page */}
+      <button
+        onClick={() => onTabChange?.("bracket")}
+        className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
+          isOnBase && activeTab === "bracket"
+            ? "text-[#0E7C66] dark:text-[#A3E635]"
+            : "text-slate-400 dark:text-slate-500"
+        }`}
+      >
+        <IconBracket />
+        Bracket
+      </button>
+
+      {/* Horário tab — switches to schedule view */}
+      <button
+        onClick={() => onTabChange?.("schedule")}
+        className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
+          isOnBase && activeTab === "schedule"
+            ? "text-[#0E7C66] dark:text-[#A3E635]"
+            : "text-slate-400 dark:text-slate-500"
+        }`}
+      >
+        <IconCalendar />
+        Horário
+      </button>
+
+      {/* Os meus jogos */}
+      <Link
+        href={`${base}/minha-dupla`}
+        className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
+          pathname.startsWith(`${base}/minha-dupla`)
+            ? "text-[#0E7C66] dark:text-[#A3E635]"
+            : "text-slate-400 dark:text-slate-500"
+        }`}
+      >
+        <IconPerson />
+        Os meus jogos
+      </Link>
+
+      {/* Estatísticas */}
+      <Link
+        href={`${base}/stats`}
+        className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
+          pathname.startsWith(`${base}/stats`)
+            ? "text-[#0E7C66] dark:text-[#A3E635]"
+            : "text-slate-400 dark:text-slate-500"
+        }`}
+      >
+        <IconStats />
+        Estatísticas
+      </Link>
     </nav>
   );
 }

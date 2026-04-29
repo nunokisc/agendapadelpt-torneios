@@ -68,6 +68,8 @@ export interface Tournament {
   courtCount: number | null;
   slotMinutes: number | null;
   scheduleDays: string | null;
+  startDate: Date | null;
+  endDate: Date | null;
   isPublic: boolean;
   registrationOpen: boolean;
   createdAt: Date;
@@ -139,4 +141,6 @@ export interface CreateTournamentInput {
   groupCount?: number;
   advanceCount?: number;
   categories?: string[];
+  startDate?: string;
+  endDate?: string;
 }

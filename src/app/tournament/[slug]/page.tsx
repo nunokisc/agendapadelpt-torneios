@@ -170,6 +170,7 @@ export default function TournamentPage() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [activeTab, setActiveTab] = useState<"bracket" | "schedule" | "registrations">("bracket");
+  const [publicTab, setPublicTab] = useState<"bracket" | "schedule">("bracket");
   const [showManageCategories, setShowManageCategories] = useState(false);
   const [fppConfirm, setFppConfirm] = useState<{ categoryId: string; description: string; matchFormat: string } | null>(null);
 
@@ -401,6 +402,28 @@ export default function TournamentPage() {
           )}
         </div>
       )}
+
+      {/* Public bracket/horário tabs (desktop, non-admin, non-draft) */}
+      {!isAdmin && !isDraft && !activeCategoryDraft && (
+        <div className="hidden sm:flex gap-1 border-b border-slate-200 dark:border-slate-700 mb-0">
+          {([
+            { key: "bracket" as const, label: "Bracket" },
+            { key: "schedule" as const, label: "Horário" },
+          ]).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setPublicTab(key)}
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                publicTab === key
+                  ? "border-[#0E7C66] text-[#0E7C66] dark:text-[#A3E635] dark:border-[#0E7C66]"
+                  : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       {!isAdmin && isDraft && tournament.registrationOpen && (
         <div className="flex items-center gap-4 mb-4 text-sm">
           <Link href={`/tournament/${slug}/register`} className="text-[#0E7C66] dark:text-[#A3E635] hover:underline flex items-center gap-1">
@@ -409,8 +432,8 @@ export default function TournamentPage() {
         </div>
       )}
 
-      {/* ── Category tabs (if multiple categories) ── */}
-      {hasMultipleCategories && (
+      {/* ── Category tabs (if multiple categories, only when viewing bracket) ── */}
+      {hasMultipleCategories && (isAdmin ? activeTab === "bracket" : publicTab === "bracket") && (
         <div className="mb-4">
           <div className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-slate-200 dark:border-slate-700 scrollbar-none">
             {categories.map((cat) => (
@@ -537,7 +560,19 @@ export default function TournamentPage() {
             </div>
           )}
 
-          {(!isAdmin || activeTab === "bracket") && (
+          {/* Public schedule tab */}
+          {!isAdmin && publicTab === "schedule" && (
+            <ScheduleManager
+              tournament={tournament}
+              allMatches={tournament.matches ?? []}
+              categories={categories}
+              token={token}
+              isAdmin={false}
+              onUpdate={fetchData}
+            />
+          )}
+
+          {(isAdmin ? activeTab === "bracket" : publicTab === "bracket") && (
             <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
               <div className="xl:col-span-1 space-y-3 hidden xl:block">
                 <PlayerList players={activeCategoryPlayers} slug={slug} token={token} categoryId={activeCategory?.id ?? null} onUpdate={fetchData} disabled />
@@ -570,7 +605,14 @@ export default function TournamentPage() {
           )}
 
           {isAdmin && activeTab === "schedule" && (
-            <ScheduleManager tournament={tournament} matches={activeCategory?.matches ?? tournament.matches} token={token} onUpdate={fetchData} />
+            <ScheduleManager
+              tournament={tournament}
+              allMatches={tournament.matches ?? []}
+              categories={categories}
+              token={token}
+              isAdmin={true}
+              onUpdate={fetchData}
+            />
           )}
           {isAdmin && activeTab === "registrations" && (
             <RegistrationPanel slug={slug} token={token} categories={categories} activeCategoryId={activeCategory?.id ?? null} onApproved={fetchData} />
@@ -633,7 +675,11 @@ export default function TournamentPage() {
               ))}
             </nav>
           ) : (
-            <TournamentBottomNav slug={slug} />
+            <TournamentBottomNav
+              slug={slug}
+              activeTab={publicTab}
+              onTabChange={(tab) => setPublicTab(tab)}
+            />
           )}
         </>
       )}

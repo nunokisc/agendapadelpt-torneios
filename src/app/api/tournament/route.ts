@@ -37,6 +37,8 @@ export async function POST(req: NextRequest) {
           thirdPlace: data.thirdPlace ?? false,
           groupCount: data.groupCount ?? null,
           advanceCount: data.advanceCount ?? null,
+          startDate: data.startDate ? new Date(data.startDate) : null,
+          endDate: data.endDate ? new Date(data.endDate) : null,
         },
       });
 

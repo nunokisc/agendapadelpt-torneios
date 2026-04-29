@@ -25,6 +25,8 @@ model Tournament {
   courtCount       Int?
   slotMinutes      Int?    // minutes per match slot (set by auto-schedule)
   scheduleDays     String? // JSON: [{date,startTime,endTime}[]] (set by auto-schedule)
+  startDate        DateTime?
+  endDate          DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

@@ -87,6 +87,7 @@ if (isMySQL) {
     { id: "setup-starpoint",   name: "20260426_starpoint" },
     { id: "setup-categories", name: "20260427_categories" },
     { id: "setup-schedule",   name: "20260427_schedule" },
+    { id: "setup-tournament-dates", name: "20260429_tournament_dates" },
   ];
 
   const db = new Database(dbPath);

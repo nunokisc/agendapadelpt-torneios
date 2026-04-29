@@ -52,6 +52,8 @@ export default function TournamentHeader({ tournament, isAdmin, onUpdate }: Tour
   const [editIsPublic, setEditIsPublic] = useState(tournament.isPublic);
   const [editRegOpen, setEditRegOpen] = useState(tournament.registrationOpen);
   const [editCourtCount, setEditCourtCount] = useState(tournament.courtCount ?? "");
+  const [editStartDate, setEditStartDate] = useState(tournament.startDate ? new Date(tournament.startDate).toISOString().split("T")[0] : "");
+  const [editEndDate, setEditEndDate] = useState(tournament.endDate ? new Date(tournament.endDate).toISOString().split("T")[0] : "");
   const [saving, setSaving] = useState(false);
 
   // Clone state
@@ -72,6 +74,8 @@ export default function TournamentHeader({ tournament, isAdmin, onUpdate }: Tour
           isPublic: editIsPublic,
           registrationOpen: editRegOpen,
           courtCount: editCourtCount !== "" ? Number(editCourtCount) : null,
+          startDate: editStartDate || null,
+          endDate: editEndDate || null,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
@@ -141,11 +145,25 @@ export default function TournamentHeader({ tournament, isAdmin, onUpdate }: Tour
                 {tournament.description}
               </p>
             )}
-            {tournament.courtCount && (
-              <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
-                {tournament.courtCount} campo{tournament.courtCount !== 1 ? "s" : ""}
-              </p>
-            )}
+            <div className="mt-0.5 flex items-center gap-3 flex-wrap">
+              {tournament.courtCount && (
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  {tournament.courtCount} campo{tournament.courtCount !== 1 ? "s" : ""}
+                </p>
+              )}
+              {tournament.startDate && tournament.endDate && (
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  {new Date(tournament.startDate).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })}
+                  {" — "}
+                  {new Date(tournament.endDate).toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })}
+                </p>
+              )}
+              {tournament.startDate && !tournament.endDate && (
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  {new Date(tournament.startDate).toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" })}
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col items-end gap-2">
@@ -159,7 +177,7 @@ export default function TournamentHeader({ tournament, isAdmin, onUpdate }: Tour
             {isAdmin && (
               <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => { setEditName(tournament.name); setEditDesc(tournament.description ?? ""); setEditIsPublic(tournament.isPublic); setEditRegOpen(tournament.registrationOpen); setEditCourtCount(tournament.courtCount ?? ""); setShowEdit(true); }}
+                  onClick={() => { setEditName(tournament.name); setEditDesc(tournament.description ?? ""); setEditIsPublic(tournament.isPublic); setEditRegOpen(tournament.registrationOpen); setEditCourtCount(tournament.courtCount ?? ""); setEditStartDate(tournament.startDate ? new Date(tournament.startDate).toISOString().split("T")[0] : ""); setEditEndDate(tournament.endDate ? new Date(tournament.endDate).toISOString().split("T")[0] : ""); setShowEdit(true); }}
                   className="text-xs px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
                   Editar
@@ -209,6 +227,32 @@ export default function TournamentHeader({ tournament, isAdmin, onUpdate }: Tour
             onChange={(e) => setEditCourtCount(e.target.value)}
             placeholder="Ex: 4"
           />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Datas do torneio <span className="text-slate-400 font-normal">(opcional)</span>
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-slate-500 mb-0.5 block">Início</label>
+                <input
+                  type="date"
+                  value={editStartDate}
+                  onChange={(e) => { setEditStartDate(e.target.value); if (editEndDate && e.target.value > editEndDate) setEditEndDate(e.target.value); }}
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7C66]"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-0.5 block">Fim</label>
+                <input
+                  type="date"
+                  value={editEndDate}
+                  min={editStartDate || undefined}
+                  onChange={(e) => setEditEndDate(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7C66]"
+                />
+              </div>
+            </div>
+          </div>
           <div className="space-y-2">
             <label className="flex items-center gap-3 cursor-pointer">
               <input

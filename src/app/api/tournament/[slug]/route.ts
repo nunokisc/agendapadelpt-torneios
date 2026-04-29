@@ -44,6 +44,8 @@ const patchSchema = z.object({
   registrationOpen: z.boolean().optional(),
   courtCount: z.number().int().min(1).max(20).nullable().optional(),
   status: z.enum(["draft","in_progress","completed"]).optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
 });
 
 export async function PATCH(
@@ -62,6 +64,12 @@ export async function PATCH(
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
 
   const data: Record<string, unknown> = { ...parsed.data };
+  if ("startDate" in data) {
+    data.startDate = data.startDate ? new Date(data.startDate as string) : null;
+  }
+  if ("endDate" in data) {
+    data.endDate = data.endDate ? new Date(data.endDate as string) : null;
+  }
   if (tournament.status !== "draft") {
     delete data.matchFormat;
     delete data.thirdPlace;

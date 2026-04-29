@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/ToastProvider";
-import type { Match, Tournament } from "@/types";
+import type { Category, Match, Tournament } from "@/types";
 
 interface Props {
   tournament: Tournament;
-  matches: Match[];
+  allMatches: Match[];
+  categories: Category[];
   token: string;
+  isAdmin: boolean;
   onUpdate: () => void;
 }
 
@@ -21,10 +23,22 @@ function todayStr() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function fmt(date: Date | string | null) {
+function dateToStr(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function fmtDateTime(date: Date | string | null) {
   if (!date) return "";
   return new Date(date).toLocaleString("pt-PT", {
-    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+    weekday: "short", day: "2-digit", month: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function fmtDateOnly(dateStr: string) {
+  return new Date(dateStr + "T12:00:00").toLocaleDateString("pt-PT", {
+    weekday: "long", day: "numeric", month: "long",
   });
 }
 
@@ -35,8 +49,25 @@ function toInputValue(date: Date | string | null) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export default function ScheduleManager({ tournament, matches, token, onUpdate }: Props) {
+function buildDaysFromRange(startDate: Date, endDate: Date): DayWindow[] {
+  const days: DayWindow[] = [];
+  const cur = new Date(startDate);
+  cur.setHours(0, 0, 0, 0);
+  const end = new Date(endDate);
+  end.setHours(0, 0, 0, 0);
+  while (cur <= end) {
+    days.push({ date: dateToStr(cur), startTime: "09:00", endTime: "20:00" });
+    cur.setDate(cur.getDate() + 1);
+  }
+  return days;
+}
+
+export default function ScheduleManager({ tournament, allMatches, categories, token, isAdmin, onUpdate }: Props) {
   const { toast } = useToast();
+  const hasMultipleCategories = categories.length > 1;
+  const [activeCatFilter, setActiveCatFilter] = useState<string>("all");
+
+  // Admin editing state
   const [editing, setEditing] = useState<string | null>(null);
   const [courtVal, setCourtVal] = useState("");
   const [timeVal, setTimeVal] = useState("");
@@ -44,21 +75,60 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
 
   // Auto-schedule form
   const [showAuto, setShowAuto] = useState(false);
-  const [days, setDays] = useState<DayWindow[]>([
-    { date: todayStr(), startTime: "09:00", endTime: "18:00" },
-  ]);
-  const [minutesPerMatch, setMinutesPerMatch] = useState(90);
+  const [days, setDays] = useState<DayWindow[]>(() => {
+    if (tournament.startDate && tournament.endDate) {
+      return buildDaysFromRange(new Date(tournament.startDate), new Date(tournament.endDate));
+    }
+    return [{ date: todayStr(), startTime: "09:00", endTime: "20:00" }];
+  });
+  const [minutesPerMatch, setMinutesPerMatch] = useState(tournament.slotMinutes ?? 90);
   const [autoLoading, setAutoLoading] = useState(false);
+
+  const categoryMap = useMemo(
+    () => new Map(categories.map((c) => [c.id, c])),
+    [categories]
+  );
+
+  const playable = useMemo(
+    () => allMatches.filter((m) => m.status !== "bye"),
+    [allMatches]
+  );
+
+  const filtered = useMemo(() => {
+    if (activeCatFilter === "all") return playable;
+    const cat = categories.find((c) => c.code === activeCatFilter);
+    if (!cat) return playable;
+    return playable.filter((m) => m.categoryId === cat.id);
+  }, [playable, activeCatFilter, categories]);
+
+  // Group filtered matches by date for the view
+  const { scheduled, unscheduled, byDate } = useMemo(() => {
+    const sched = filtered.filter((m) => m.scheduledAt);
+    const unsched = filtered.filter((m) => !m.scheduledAt);
+
+    const groups: Record<string, Match[]> = {};
+    for (const m of [...sched].sort((a, b) =>
+      new Date(a.scheduledAt!).getTime() - new Date(b.scheduledAt!).getTime()
+    )) {
+      const dateKey = dateToStr(new Date(m.scheduledAt!));
+      (groups[dateKey] ??= []).push(m);
+    }
+    return { scheduled: sched, unscheduled: unsched, byDate: groups };
+  }, [filtered]);
+
+  function matchLabel(m: Match) {
+    if (m.bracketType === "final") return "Final";
+    if (m.bracketType === "third_place") return "3.º lugar";
+    if (m.bracketType === "group") return `Grupo ${(m.groupIndex ?? 0) + 1} J${m.position + 1}`;
+    return `R${m.round} J${m.position + 1}`;
+  }
 
   function addDay() {
     setDays((prev) => {
       const last = prev[prev.length - 1];
-      // Suggest the day after the last one
       const next = new Date(last.date + "T12:00:00");
       next.setDate(next.getDate() + 1);
-      const pad = (n: number) => String(n).padStart(2, "0");
-      const nextDate = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`;
-      return [...prev, { date: nextDate, startTime: last.startTime, endTime: last.endTime }];
+      return [...prev, { date: dateToStr(next), startTime: last.startTime, endTime: last.endTime }];
     });
   }
 
@@ -67,10 +137,13 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
   }
 
   function updateDay(i: number, field: keyof DayWindow, value: string) {
-    setDays((prev) => prev.map((d, idx) => idx === i ? { ...d, [field]: value } : d));
+    setDays((prev) => prev.map((d, idx) => (idx === i ? { ...d, [field]: value } : d)));
   }
 
-  const playable = matches.filter((m) => m.status !== "bye");
+  function fillFromTournamentDates() {
+    if (!tournament.startDate || !tournament.endDate) return;
+    setDays(buildDaysFromRange(new Date(tournament.startDate), new Date(tournament.endDate)));
+  }
 
   function startEdit(m: Match) {
     setEditing(m.id);
@@ -122,29 +195,74 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
   }
 
   const courts = tournament.courtCount ?? 1;
+  const hasTournamentDates = Boolean(tournament.startDate && tournament.endDate);
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Agenda de jogos</CardTitle>
-          <button
-            onClick={() => setShowAuto((v) => !v)}
-            className="text-xs text-[#0E7C66] hover:text-[#0E7C66] dark:text-[#A3E635] transition-colors"
-          >
-            Agendar automaticamente
-          </button>
+          <div>
+            <CardTitle>Horário do Torneio</CardTitle>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {courts} campo{courts !== 1 ? "s" : ""} · {scheduled.length} de {playable.length} jogos agendados
+            </p>
+          </div>
+          {isAdmin && (
+            <button
+              onClick={() => setShowAuto((v) => !v)}
+              className="text-xs text-[#0E7C66] hover:text-[#0a6354] dark:text-[#A3E635] transition-colors whitespace-nowrap"
+            >
+              Agendar automaticamente
+            </button>
+          )}
         </div>
-        <p className="text-xs text-slate-500 mt-0.5">
-          {courts} campo{courts !== 1 ? "s" : ""} disponível{courts !== 1 ? "is" : ""}
-        </p>
       </CardHeader>
 
-      {showAuto && (
+      {/* Category filter */}
+      {hasMultipleCategories && (
+        <div className="flex gap-1.5 flex-wrap mb-4">
+          <button
+            onClick={() => setActiveCatFilter("all")}
+            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+              activeCatFilter === "all"
+                ? "bg-[#d1fae5] text-[#0E7C66] dark:bg-[#0E7C66]/20 dark:text-[#A3E635] ring-1 ring-[#0E7C66]"
+                : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+            }`}
+          >
+            Todas
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCatFilter(cat.code)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                activeCatFilter === cat.code
+                  ? "bg-[#d1fae5] text-[#0E7C66] dark:bg-[#0E7C66]/20 dark:text-[#A3E635] ring-1 ring-[#0E7C66]"
+                  : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+              }`}
+            >
+              {cat.code}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Auto-schedule form (admin only) */}
+      {isAdmin && showAuto && (
         <div className="mb-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
-          <p className="text-xs text-slate-500">
-            Distribui todos os jogos pelos {courts} campo{courts !== 1 ? "s" : ""} pelas janelas horárias definidas.
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-500">
+              Distribui todos os jogos pelos {courts} campo{courts !== 1 ? "s" : ""} pelas janelas horárias definidas.
+            </p>
+            {hasTournamentDates && (
+              <button
+                onClick={fillFromTournamentDates}
+                className="text-xs text-[#0E7C66] dark:text-[#A3E635] hover:underline whitespace-nowrap ml-2"
+              >
+                Usar datas do torneio
+              </button>
+            )}
+          </div>
 
           <div className="space-y-2">
             {days.map((day, i) => (
@@ -216,101 +334,140 @@ export default function ScheduleManager({ tournament, matches, token, onUpdate }
         </div>
       )}
 
-      <div className="space-y-1">
-        {playable.length === 0 && (
-          <p className="text-sm text-slate-400 text-center py-4">
-            Sem jogos agendáveis ainda. Gera o bracket primeiro.
-          </p>
-        )}
-        {playable.map((m) => {
-          const isEditing = editing === m.id;
-          const label = m.bracketType === "final" ? "Final"
-            : m.bracketType === "third_place" ? "3.º lugar"
-            : `R${m.round} J${m.position + 1}`;
-          const team1 = m.team1?.name ?? "—";
-          const team2 = m.team2?.name ?? "—";
-
-          return (
-            <div
-              key={m.id}
-              className="rounded-lg border border-slate-100 dark:border-slate-800 px-3 py-2"
-            >
-              {isEditing ? (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">{label}: {team1} vs {team2}</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs text-slate-500">Campo</label>
-                      <input
-                        value={courtVal}
-                        onChange={(e) => setCourtVal(e.target.value)}
-                        placeholder={`Campo 1`}
-                        className="mt-0.5 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#0E7C66]"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-500">Hora</label>
-                      <input
-                        type="datetime-local"
-                        value={timeVal}
-                        onChange={(e) => setTimeVal(e.target.value)}
-                        className="mt-0.5 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#0E7C66]"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" loading={saving} onClick={() => saveMatch(m.id)}>Guardar</Button>
-                    <Button size="sm" variant="secondary" onClick={() => setEditing(null)}>Cancelar</Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{label}</p>
-                    <p className="text-sm text-slate-700 dark:text-slate-300 truncate">
-                      {team1} <span className="text-slate-400">vs</span> {team2}
-                    </p>
-                    {(m.court || m.scheduledAt) && (
-                      <p className="text-xs text-[#0E7C66] dark:text-[#A3E635] mt-0.5">
-                        {m.court}{m.court && m.scheduledAt ? " · " : ""}{m.scheduledAt ? fmt(m.scheduledAt) : ""}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {m.court && m.scheduledAt && (
-                      <a
-                        href={(() => {
-                          const d = new Date(m.scheduledAt);
-                          const dateStr = d.toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" });
-                          const timeStr = d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
-                          const t1 = m.team1?.name ?? "?";
-                          const t2 = m.team2?.name ?? "?";
-                          const msg = `🎾 *${tournament.name}*\n\n*${t1}* vs *${t2}*\n📅 ${dateStr} às ${timeStr}\n🏟️ ${m.court}\n\nBoa sorte a todas as duplas!`;
-                          return `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
-                        })()}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[#0E7C66] hover:text-[#0E7C66] transition-colors"
-                        title="Partilhar jogo via WhatsApp"
-                      >
-                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                        </svg>
-                      </a>
-                    )}
-                    <button
-                      onClick={() => startEdit(m)}
-                      className="text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-                    >
-                      {m.court || m.scheduledAt ? "Editar" : "Agendar"}
-                    </button>
-                  </div>
-                </div>
-              )}
+      {/* Match list grouped by date */}
+      {filtered.length === 0 ? (
+        <p className="text-sm text-slate-400 text-center py-4">
+          Sem jogos agendáveis ainda. Gera o bracket primeiro.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {/* Scheduled matches grouped by date */}
+          {Object.entries(byDate).map(([dateKey, matches]) => (
+            <div key={dateKey}>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">
+                {fmtDateOnly(dateKey)}
+              </p>
+              <div className="space-y-1">
+                {matches.map((m) => renderMatch(m))}
+              </div>
             </div>
-          );
-        })}
-      </div>
+          ))}
+
+          {/* Unscheduled matches */}
+          {unscheduled.length > 0 && (
+            <div>
+              {scheduled.length > 0 && (
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+                  Sem data marcada
+                </p>
+              )}
+              <div className="space-y-1">
+                {unscheduled.map((m) => renderMatch(m))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </Card>
   );
+
+  function renderMatch(m: Match) {
+    const isEditing = editing === m.id;
+    const label = matchLabel(m);
+    const team1 = m.team1?.name ?? "—";
+    const team2 = m.team2?.name ?? "—";
+    const cat = m.categoryId ? categoryMap.get(m.categoryId) : null;
+
+    return (
+      <div
+        key={m.id}
+        className="rounded-lg border border-slate-100 dark:border-slate-800 px-3 py-2"
+      >
+        {isEditing ? (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+              {label}: {team1} vs {team2}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-slate-500">Campo</label>
+                <input
+                  value={courtVal}
+                  onChange={(e) => setCourtVal(e.target.value)}
+                  placeholder="Campo 1"
+                  className="mt-0.5 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#0E7C66]"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500">Hora</label>
+                <input
+                  type="datetime-local"
+                  value={timeVal}
+                  onChange={(e) => setTimeVal(e.target.value)}
+                  className="mt-0.5 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#0E7C66]"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" loading={saving} onClick={() => saveMatch(m.id)}>Guardar</Button>
+              <Button size="sm" variant="secondary" onClick={() => setEditing(null)}>Cancelar</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{label}</p>
+                {hasMultipleCategories && cat && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                    {cat.code}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-slate-700 dark:text-slate-300 truncate">
+                {team1} <span className="text-slate-400">vs</span> {team2}
+              </p>
+              {(m.court || m.scheduledAt) && (
+                <p className="text-xs text-[#0E7C66] dark:text-[#A3E635] mt-0.5">
+                  {m.court}{m.court && m.scheduledAt ? " · " : ""}{m.scheduledAt ? fmtDateTime(m.scheduledAt) : ""}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {m.court && m.scheduledAt && (
+                <a
+                  href={(() => {
+                    const d = new Date(m.scheduledAt);
+                    const dateStr = d.toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" });
+                    const timeStr = d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+                    const t1 = m.team1?.name ?? "?";
+                    const t2 = m.team2?.name ?? "?";
+                    const catLabel = cat ? ` — Série ${cat.code}` : "";
+                    const msg = `🎾 *${tournament.name}*${catLabel}\n\n*${t1}* vs *${t2}*\n📅 ${dateStr} às ${timeStr}\n🏟️ ${m.court}\n\nBoa sorte a todas as duplas!`;
+                    return `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+                  })()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#0E7C66] hover:text-[#0a6354] transition-colors"
+                  title="Partilhar jogo via WhatsApp"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                  </svg>
+                </a>
+              )}
+              {isAdmin && (
+                <button
+                  onClick={() => startEdit(m)}
+                  className="text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                >
+                  {m.court || m.scheduledAt ? "Editar" : "Agendar"}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 }
