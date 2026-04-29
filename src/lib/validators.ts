@@ -20,6 +20,7 @@ export const createTournamentSchema = z.object({
   categories: z.array(z.string().min(1).max(20)).min(1).optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida (YYYY-MM-DD)").optional(),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida (YYYY-MM-DD)").optional(),
+  slotMinutes: z.number().int().min(15).max(240).optional(),
 });
 
 export const addTeamSchema = z.object({

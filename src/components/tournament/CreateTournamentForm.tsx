@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -64,6 +64,63 @@ const CATEGORY_GROUPS = FPP_CATEGORIES.reduce<Record<string, typeof FPP_CATEGORI
 );
 const CATEGORY_GROUP_ORDER = Array.from(new Set(FPP_CATEGORIES.map((c) => c.group)));
 
+type DayWindow = { date: string; startTime: string; endTime: string };
+
+function dateToStr(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function buildDays(start: string, end: string): DayWindow[] {
+  const days: DayWindow[] = [];
+  const cur = new Date(start + "T12:00:00");
+  const fin = new Date(end + "T12:00:00");
+  while (cur <= fin) {
+    days.push({ date: dateToStr(cur), startTime: "09:00", endTime: "23:59" });
+    cur.setDate(cur.getDate() + 1);
+  }
+  return days.slice(0, 30);
+}
+
+function fmtWeekday(dateStr: string) {
+  return new Date(dateStr + "T12:00:00").toLocaleDateString("pt-PT", {
+    weekday: "short", day: "numeric", month: "short",
+  });
+}
+
+// Matches needed per category given format parameters and team count
+function matchesPerCategory(
+  format: string,
+  groupCount: number,
+  advanceCount: number,
+  teams: number,
+  hasThirdPlace: boolean
+): { groupMatches: number; knockoutMatches: number; total: number } {
+  if (teams < 2) return { groupMatches: 0, knockoutMatches: 0, total: 0 };
+
+  if (format === "groups_knockout") {
+    const tpg = Math.ceil(teams / groupCount);
+    const groupMatches = groupCount * Math.floor((tpg * (tpg - 1)) / 2);
+    const advancers = groupCount * advanceCount;
+    const knockoutMatches = Math.max(0, advancers - 1) + (hasThirdPlace ? 1 : 0);
+    return { groupMatches, knockoutMatches, total: groupMatches + knockoutMatches };
+  }
+  if (format === "single_elimination" || format === "fpp_auto") {
+    const ko = teams - 1 + (hasThirdPlace ? 1 : 0);
+    return { groupMatches: 0, knockoutMatches: ko, total: ko };
+  }
+  if (format === "double_elimination") {
+    const ko = (teams - 1) * 2;
+    return { groupMatches: 0, knockoutMatches: ko, total: ko };
+  }
+  if (format === "round_robin") {
+    const rr = Math.floor((teams * (teams - 1)) / 2);
+    return { groupMatches: rr, knockoutMatches: 0, total: rr };
+  }
+  const ko = teams - 1;
+  return { groupMatches: 0, knockoutMatches: ko, total: ko };
+}
+
 function FPPAutoInfo() {
   return (
     <div className="rounded-lg bg-[#d1fae5]/40 dark:bg-[#0E7C66]/10 border border-[#0E7C66]/30 dark:border-[#0E7C66]/30 px-3 py-2.5 text-xs text-[#0a6354] dark:text-[#A3E635]">
@@ -95,9 +152,57 @@ export default function CreateTournamentForm() {
   const [endDate, setEndDate] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>(["OPEN"]);
 
+  // Scheduling configuration
+  const [days, setDays] = useState<DayWindow[]>([]);
+  const [minutesPerMatch, setMinutesPerMatch] = useState(90);
+  const [teamsPerCat, setTeamsPerCat] = useState(8);
+
   const isFPPAuto = tournamentMode === "fpp_auto";
   const isGroups = !isFPPAuto && format === "groups_knockout";
   const isSingle = !isFPPAuto && format === "single_elimination";
+  const effectiveFormat = isFPPAuto ? "fpp_auto" : format;
+  const courts = Math.max(1, Number(courtCount) || 1);
+
+  // Total available match slots
+  const totalSlots = useMemo(() => {
+    if (days.length === 0) return 0;
+    return days.reduce((acc, d) => {
+      const [sh, sm] = d.startTime.split(":").map(Number);
+      const [eh, em] = d.endTime.split(":").map(Number);
+      const windowMins = eh * 60 + em - (sh * 60 + sm);
+      return acc + Math.floor(windowMins / minutesPerMatch) * courts;
+    }, 0);
+  }, [days, minutesPerMatch, courts]);
+
+  // Capacity estimate for the selected team count
+  const estimate = useMemo(() => {
+    const mpc = matchesPerCategory(effectiveFormat, groupCount, advanceCount, teamsPerCat, thirdPlace);
+    const cats = selectedCategories.length;
+    const totalNeeded = mpc.total * cats;
+    const slack = totalSlots - totalNeeded;
+    const maxCats = mpc.total > 0 ? Math.floor(totalSlots / mpc.total) : 0;
+    return { mpc, totalNeeded, slack, maxCats };
+  }, [effectiveFormat, groupCount, advanceCount, teamsPerCat, thirdPlace, selectedCategories.length, totalSlots]);
+
+  function applyDates(s: string, e: string) {
+    if (s && e && s <= e) setDays(buildDays(s, e));
+    else if (s && !e) setDays(buildDays(s, s));
+    else if (!s) setDays([]);
+  }
+
+  function handleStartDate(v: string) {
+    setStartDate(v);
+    if (endDate && v > endDate) { setEndDate(v); applyDates(v, v); }
+    else applyDates(v, endDate);
+  }
+  function handleEndDate(v: string) {
+    setEndDate(v);
+    applyDates(startDate, v);
+  }
+
+  function updateDay(i: number, field: keyof DayWindow, v: string) {
+    setDays((prev) => prev.map((d, idx) => idx === i ? { ...d, [field]: v } : d));
+  }
 
   function toggleCategory(code: string) {
     setSelectedCategories((prev) =>
@@ -108,7 +213,6 @@ export default function CreateTournamentForm() {
   function handleModeChange(mode: TournamentMode) {
     setTournamentMode(mode);
     if (mode === "fpp_auto") {
-      // Switch from OPEN to M3 when moving to FPP auto
       setSelectedCategories((prev) => {
         const fpp = prev.filter((c) => c !== "OPEN");
         return fpp.length > 0 ? fpp : ["M3"];
@@ -126,7 +230,6 @@ export default function CreateTournamentForm() {
 
     setLoading(true);
     try {
-      const effectiveFormat: TournamentFormat = isFPPAuto ? "fpp_auto" : format;
       const body: Record<string, unknown> = {
         name: name.trim(),
         description: description.trim() || undefined,
@@ -139,6 +242,7 @@ export default function CreateTournamentForm() {
         categories: selectedCategories,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
+        slotMinutes: minutesPerMatch,
       };
       if (isGroups) {
         body.groupCount = groupCount;
@@ -163,6 +267,8 @@ export default function CreateTournamentForm() {
       setLoading(false);
     }
   }
+
+  const showCapacity = days.length > 0;
 
   return (
     <Card className="w-full max-w-xl">
@@ -376,35 +482,102 @@ export default function CreateTournamentForm() {
           onChange={(e) => setCourtCount(e.target.value)}
         />
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Datas do torneio <span className="text-slate-400 font-normal">(opcional)</span>
-          </label>
+        {/* Bloco C — Disponibilidade e capacidade */}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Disponibilidade
+            </label>
+            <span className="text-xs text-slate-400">Define os dias e horários do torneio</span>
+          </div>
+
+          {/* Date range */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-slate-500 mb-0.5 block">Início</label>
+              <label className="text-xs text-slate-500 mb-0.5 block">Data de início</label>
               <input
                 type="date"
                 value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value);
-                  if (endDate && e.target.value > endDate) setEndDate(e.target.value);
-                }}
+                onChange={(e) => handleStartDate(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0E7C66] focus:border-transparent dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               />
             </div>
             <div>
-              <label className="text-xs text-slate-500 mb-0.5 block">Fim</label>
+              <label className="text-xs text-slate-500 mb-0.5 block">Data de fim</label>
               <input
                 type="date"
                 value={endDate}
                 min={startDate || undefined}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(e) => handleEndDate(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0E7C66] focus:border-transparent dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               />
             </div>
           </div>
-          <p className="text-xs text-slate-400">Usado para pré-preencher o agendamento automático.</p>
+
+          {/* Per-day time windows */}
+          {days.length > 0 && (
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden">
+              <div className="grid grid-cols-[1fr_auto_auto] gap-0 text-[10px] font-semibold uppercase tracking-wide text-slate-400 px-3 py-1.5 bg-slate-50 dark:bg-slate-800/60">
+                <span>Dia</span>
+                <span className="w-20 text-center">Início</span>
+                <span className="w-20 text-center">Fim</span>
+              </div>
+              {days.map((day, i) => (
+                <div key={day.date} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center px-3 py-1.5">
+                  <span className="text-xs text-slate-600 dark:text-slate-300 capitalize truncate">
+                    {fmtWeekday(day.date)}
+                  </span>
+                  <input
+                    type="time"
+                    value={day.startTime}
+                    onChange={(e) => updateDay(i, "startTime", e.target.value)}
+                    className="w-20 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-[#0E7C66]"
+                  />
+                  <input
+                    type="time"
+                    value={day.endTime}
+                    onChange={(e) => updateDay(i, "endTime", e.target.value)}
+                    className="w-20 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-[#0E7C66]"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Minutes per match */}
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-slate-600 dark:text-slate-400 shrink-0">Duração por jogo</label>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min={15}
+                max={240}
+                value={minutesPerMatch}
+                onChange={(e) => setMinutesPerMatch(Math.max(15, Math.min(240, Number(e.target.value))))}
+                className="w-16 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#0E7C66]"
+              />
+              <span className="text-sm text-slate-400">min</span>
+            </div>
+          </div>
+
+          {/* Capacity estimate */}
+          {showCapacity && (
+            <CapacityBox
+              totalSlots={totalSlots}
+              courts={courts}
+              days={days}
+              minutesPerMatch={minutesPerMatch}
+              format={effectiveFormat}
+              groupCount={groupCount}
+              advanceCount={advanceCount}
+              thirdPlace={isSingle || isFPPAuto ? thirdPlace : false}
+              categoryCount={selectedCategories.length}
+              teamsPerCat={teamsPerCat}
+              onTeamsChange={setTeamsPerCat}
+              estimate={estimate}
+              isGroups={isGroups}
+            />
+          )}
         </div>
 
         {error && (
@@ -418,5 +591,128 @@ export default function CreateTournamentForm() {
         </Button>
       </form>
     </Card>
+  );
+}
+
+// ── Capacity estimate box ──────────────────────────────────────────────────────
+
+interface CapacityBoxProps {
+  totalSlots: number;
+  courts: number;
+  days: DayWindow[];
+  minutesPerMatch: number;
+  format: string;
+  groupCount: number;
+  advanceCount: number;
+  thirdPlace: boolean;
+  categoryCount: number;
+  teamsPerCat: number;
+  onTeamsChange: (n: number) => void;
+  estimate: {
+    mpc: { groupMatches: number; knockoutMatches: number; total: number };
+    totalNeeded: number;
+    slack: number;
+    maxCats: number;
+  };
+  isGroups: boolean;
+}
+
+function CapacityBox({
+  totalSlots, courts, days, minutesPerMatch,
+  format, groupCount, advanceCount, isGroups,
+  categoryCount, teamsPerCat, onTeamsChange, estimate,
+}: CapacityBoxProps) {
+  const { mpc, totalNeeded, slack, maxCats } = estimate;
+  const fits = slack >= 0;
+  const hasEstimate = mpc.total > 0 && totalSlots > 0;
+
+  const formatLabel: Record<string, string> = {
+    groups_knockout: "Grupos + Eliminação",
+    single_elimination: "Eliminação Simples",
+    double_elimination: "Eliminação Dupla",
+    round_robin: "Todos contra Todos",
+    fpp_auto: "FPP Automático",
+  };
+
+  return (
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 p-3 space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Estimativa de capacidade</p>
+        <p className="text-[10px] text-slate-400">
+          {totalSlots} slot{totalSlots !== 1 ? "s" : ""} × {minutesPerMatch} min
+          {" · "}{courts} campo{courts !== 1 ? "s" : ""}
+          {" · "}{days.length} dia{days.length !== 1 ? "s" : ""}
+        </p>
+      </div>
+
+      {/* Teams per category control */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-slate-500 shrink-0">Duplas por série:</span>
+        <button
+          type="button"
+          onClick={() => onTeamsChange(Math.max(2, teamsPerCat - 1))}
+          className="w-6 h-6 rounded border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm font-bold flex items-center justify-center"
+        >−</button>
+        <span className="w-8 text-center text-sm font-semibold text-slate-700 dark:text-slate-200">{teamsPerCat}</span>
+        <button
+          type="button"
+          onClick={() => onTeamsChange(Math.min(32, teamsPerCat + 1))}
+          className="w-6 h-6 rounded border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm font-bold flex items-center justify-center"
+        >+</button>
+      </div>
+
+      {hasEstimate && (
+        <>
+          {/* Match breakdown */}
+          <div className="text-xs space-y-0.5 text-slate-500 dark:text-slate-400">
+            <p className="font-medium text-slate-600 dark:text-slate-300">
+              {formatLabel[format] ?? format}
+              {isGroups && ` — ${groupCount} grupos, ${advanceCount} avançam`}
+            </p>
+            {mpc.groupMatches > 0 && (
+              <p>Fase de grupos: <span className="font-medium text-slate-600 dark:text-slate-300">{mpc.groupMatches} jogo{mpc.groupMatches !== 1 ? "s" : ""}</span> por série</p>
+            )}
+            {mpc.knockoutMatches > 0 && (
+              <p>Fase eliminatória: <span className="font-medium text-slate-600 dark:text-slate-300">{mpc.knockoutMatches} jogo{mpc.knockoutMatches !== 1 ? "s" : ""}</span> por série</p>
+            )}
+            <p className="font-semibold text-slate-600 dark:text-slate-300">
+              Total por série: {mpc.total} jogos
+            </p>
+          </div>
+
+          {/* Result */}
+          <div className={`rounded-md px-3 py-2 text-xs ${
+            fits
+              ? "bg-emerald-50 dark:bg-[#0E7C66]/10 border border-emerald-200 dark:border-[#0E7C66]/30 text-emerald-700 dark:text-[#A3E635]"
+              : "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400"
+          }`}>
+            <p className="font-semibold">
+              {categoryCount} série{categoryCount !== 1 ? "s" : ""} × {mpc.total} = {totalNeeded} jogos
+              {fits
+                ? ` · cabe (${slack} slot${slack !== 1 ? "s" : ""} livres)`
+                : ` · ${Math.abs(slack)} jogo${Math.abs(slack) !== 1 ? "s" : ""} a mais`}
+            </p>
+            {!fits && maxCats > 0 && (
+              <p className="mt-0.5 opacity-80">
+                Com {teamsPerCat} duplas por série, cabem no máximo {maxCats} série{maxCats !== 1 ? "s" : ""}
+              </p>
+            )}
+            {fits && (
+              <p className="mt-0.5 opacity-80">
+                Capacidade máxima: {maxCats} série{maxCats !== 1 ? "s" : ""} com {teamsPerCat} duplas cada
+              </p>
+            )}
+          </div>
+        </>
+      )}
+
+      {!hasEstimate && totalSlots > 0 && (
+        <p className="text-xs text-slate-400">Ajusta as duplas por série para ver a estimativa.</p>
+      )}
+      {totalSlots === 0 && (
+        <p className="text-xs text-slate-400">Define os horários de cada dia para calcular a capacidade.</p>
+      )}
+    </div>
   );
 }
