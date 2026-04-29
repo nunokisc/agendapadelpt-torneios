@@ -57,6 +57,37 @@ function toInputValue(date: Date | string | null) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function fmtInterval(date: Date | string, slotMinutes: number) {
+  const start = new Date(date);
+  const end = new Date(start.getTime() + slotMinutes * 60_000);
+  const t = (d: Date) => d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+  return `${t(start)}–${t(end)}`;
+}
+
+function findConflict(
+  court: string,
+  timeStr: string,
+  slotMinutes: number,
+  allMatches: Match[],
+  excludeId: string
+): Match | null {
+  if (!court.trim() || !timeStr) return null;
+  const newStart = new Date(timeStr).getTime();
+  if (isNaN(newStart)) return null;
+  const newEnd = newStart + slotMinutes * 60_000;
+  const courtNorm = court.trim().toLowerCase();
+
+  for (const m of allMatches) {
+    if (m.id === excludeId) continue;
+    if (!m.court || !m.scheduledAt) continue;
+    if (m.court.trim().toLowerCase() !== courtNorm) continue;
+    const mStart = new Date(m.scheduledAt).getTime();
+    const mEnd = mStart + slotMinutes * 60_000;
+    if (newStart < mEnd && newEnd > mStart) return m;
+  }
+  return null;
+}
+
 function buildDaysFromRange(start: Date, end: Date): DayWindow[] {
   const days: DayWindow[] = [];
   const cur = new Date(start); cur.setHours(0, 0, 0, 0);
@@ -74,15 +105,20 @@ interface EditPanelProps {
   match: Match;
   slug: string;
   token: string;
+  slotMinutes: number;
+  allMatches: Match[];
   onSaved: () => void;
   onCancel: () => void;
 }
 
-function EditPanel({ match, slug, token, onSaved, onCancel }: EditPanelProps) {
+function EditPanel({ match, slug, token, slotMinutes, allMatches, onSaved, onCancel }: EditPanelProps) {
   const { toast } = useToast();
   const [courtVal, setCourtVal] = useState(match.court ?? "");
   const [timeVal, setTimeVal] = useState(toInputValue(match.scheduledAt));
   const [saving, setSaving] = useState(false);
+
+  // Live conflict detection
+  const conflict = findConflict(courtVal, timeVal, slotMinutes, allMatches, match.id);
 
   async function save() {
     setSaving(true);
@@ -106,30 +142,67 @@ function EditPanel({ match, slug, token, onSaved, onCancel }: EditPanelProps) {
     }
   }
 
+  const hasConflict = Boolean(conflict);
+  const courtCls = `rounded-md border px-2 py-1 text-xs focus:outline-none focus:ring-1 w-28 bg-white dark:bg-slate-800 ${
+    hasConflict
+      ? "border-amber-400 focus:ring-amber-400 dark:border-amber-500"
+      : "border-slate-300 dark:border-slate-600 focus:ring-[#0E7C66]"
+  }`;
+  const timeCls = `rounded-md border px-2 py-1 text-xs focus:outline-none focus:ring-1 bg-white dark:bg-slate-800 ${
+    hasConflict
+      ? "border-amber-400 focus:ring-amber-400 dark:border-amber-500"
+      : "border-slate-300 dark:border-slate-600 focus:ring-[#0E7C66]"
+  }`;
+
   return (
-    <div className="flex items-end gap-2 flex-wrap py-2 px-3 bg-slate-50 dark:bg-slate-800/60 rounded-b-lg border-t border-slate-100 dark:border-slate-700">
-      <div>
-        <label className="block text-[10px] text-slate-400 mb-0.5">Campo</label>
-        <input
-          value={courtVal}
-          onChange={(e) => setCourtVal(e.target.value)}
-          placeholder="Campo 1"
-          className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#0E7C66] w-28"
-        />
+    <div className="py-2 px-3 bg-slate-50 dark:bg-slate-800/60 rounded-b-lg border-t border-slate-100 dark:border-slate-700 space-y-2">
+      <div className="flex items-end gap-2 flex-wrap">
+        <div>
+          <label className="block text-[10px] text-slate-400 mb-0.5">Campo</label>
+          <input
+            value={courtVal}
+            onChange={(e) => setCourtVal(e.target.value)}
+            placeholder="Campo 1"
+            className={courtCls}
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] text-slate-400 mb-0.5">Data / Hora início</label>
+          <input
+            type="datetime-local"
+            value={timeVal}
+            onChange={(e) => setTimeVal(e.target.value)}
+            className={timeCls}
+          />
+        </div>
+        {timeVal && slotMinutes > 0 && (
+          <div className="pb-0.5">
+            <p className="text-[10px] text-slate-400 mb-0.5">Fim</p>
+            <p className="text-xs font-mono text-slate-500 dark:text-slate-400 py-1">
+              {new Date(new Date(timeVal).getTime() + slotMinutes * 60_000)
+                .toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}
+            </p>
+          </div>
+        )}
+        <div className="flex gap-1.5 pb-0.5">
+          <Button size="sm" loading={saving} onClick={save}>Guardar</Button>
+          <Button size="sm" variant="secondary" onClick={onCancel}>Cancelar</Button>
+        </div>
       </div>
-      <div>
-        <label className="block text-[10px] text-slate-400 mb-0.5">Data / Hora</label>
-        <input
-          type="datetime-local"
-          value={timeVal}
-          onChange={(e) => setTimeVal(e.target.value)}
-          className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#0E7C66]"
-        />
-      </div>
-      <div className="flex gap-1.5 pb-0.5">
-        <Button size="sm" loading={saving} onClick={save}>Guardar</Button>
-        <Button size="sm" variant="secondary" onClick={onCancel}>Cancelar</Button>
-      </div>
+      {conflict && (
+        <div className="flex items-start gap-1.5 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-2.5 py-2 text-xs text-amber-700 dark:text-amber-400">
+          <svg className="h-3.5 w-3.5 mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <span>
+            <strong>{courtVal}</strong> já está ocupado nesse horário —{" "}
+            {conflict.team1?.name ?? "?"} vs {conflict.team2?.name ?? "?"}
+            {conflict.scheduledAt && (
+              <> ({fmtInterval(conflict.scheduledAt, slotMinutes)})</>
+            )}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -299,7 +372,7 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
         <tr className={`border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors ${isEditing ? "bg-slate-50/80 dark:bg-slate-800/50" : ""}`}>
           {/* Time */}
           <td className="px-3 py-2.5 text-xs font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
-            {m.scheduledAt && showTime ? fmtTime(m.scheduledAt) : ""}
+            {m.scheduledAt && showTime ? fmtInterval(m.scheduledAt, tournament.slotMinutes ?? 90) : ""}
           </td>
           {/* Court */}
           <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
@@ -364,6 +437,8 @@ export default function ScheduleManager({ tournament, allMatches, categories, to
                 match={m}
                 slug={tournament.slug}
                 token={token}
+                slotMinutes={tournament.slotMinutes ?? 90}
+                allMatches={allMatches}
                 onSaved={() => { setEditingId(null); onUpdate(); }}
                 onCancel={() => setEditingId(null)}
               />
