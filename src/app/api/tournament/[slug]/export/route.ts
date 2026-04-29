@@ -12,6 +12,7 @@ export async function GET(
   const tournament = await prisma.tournament.findUnique({
     where: { slug },
     include: {
+      categories: true,
       players: { orderBy: { seed: "asc" } },
       matches: {
         include: { team1: true, team2: true, winner: true },
@@ -28,20 +29,26 @@ export async function GET(
     return generateICal(tournament);
   }
 
-  // Default: CSV
   return generateCSV(tournament);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function generateCSV(tournament: any) {
+  const catMap = new Map<string, string>();
+  for (const c of tournament.categories ?? []) {
+    catMap.set(c.id, c.code);
+  }
+
   const lines: string[] = [];
-  lines.push("Ronda,Posição,Tipo,Dupla 1,Dupla 2,Vencedor,Resultado,Campo,Data/Hora,Estado");
+  lines.push("Série,Ronda,Posição,Tipo,Dupla 1,Dupla 2,Vencedor,Resultado,W/O,Campo,Data/Hora,Estado");
 
   for (const m of tournament.matches) {
     if (m.status === "bye") continue;
     const scores: SetScore[] = m.scores ? JSON.parse(m.scores) : [];
     const scoreStr = scores.map((s: SetScore) => `${s.team1}-${s.team2}`).join(" ");
+    const serie = m.categoryId ? (catMap.get(m.categoryId) ?? "") : "";
     const row = [
+      csvEscape(serie),
       m.round,
       m.position + 1,
       m.bracketType,
@@ -49,6 +56,7 @@ function generateCSV(tournament: any) {
       csvEscape(m.team2?.name ?? ""),
       csvEscape(m.winner?.name ?? ""),
       csvEscape(scoreStr),
+      m.walkover ?? "",
       csvEscape(m.court ?? ""),
       m.scheduledAt ? new Date(m.scheduledAt).toISOString() : "",
       m.status,
@@ -73,6 +81,8 @@ function csvEscape(str: string): string {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function generateICal(tournament: any) {
+  const slotMs = (tournament.slotMinutes ?? 90) * 60 * 1000;
+
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -85,7 +95,7 @@ function generateICal(tournament: any) {
   for (const m of tournament.matches) {
     if (m.status === "bye" || !m.scheduledAt) continue;
     const start = new Date(m.scheduledAt);
-    const end = new Date(start.getTime() + 90 * 60 * 1000); // 90 min default
+    const end = new Date(start.getTime() + slotMs);
 
     const team1 = m.team1?.name ?? "TBD";
     const team2 = m.team2?.name ?? "TBD";

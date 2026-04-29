@@ -40,6 +40,7 @@ export async function POST(
         groupCount: tournament.groupCount,
         advanceCount: tournament.advanceCount,
         courtCount: tournament.courtCount,
+        slotMinutes: tournament.slotMinutes,
         status: "draft",
       },
     });
