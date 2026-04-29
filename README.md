@@ -120,17 +120,28 @@ Os formatos FPP são aliases dos FFT: PRO≡D1, PROPO≡D2, M3S≡B1, M3SPO≡B2
 - Avanço automático no bracket após cada resultado
 - **Reset de resultado** — um jogo já concluído pode ter o resultado reposto desde que o jogo seguinte no bracket ainda não tenha resultado; confirmação obrigatória no modal
 - **Início de jogo** — botão "Iniciar jogo" regista `startedAt`; ao submeter o resultado, o sistema calcula o atraso relativamente ao slot agendado e empurra automaticamente os jogos seguintes no mesmo campo (_delay-push_)
+- **Falta de comparência (walkover)** — o admin pode registar no modal que uma dupla não compareceu; a dupla ausente perde por W/O, o score é gerado automaticamente a zero (ex. M3SPO → `6-0, 6-0`; D1 → `9-0`) e o badge **W/O** aparece no cartão de jogo; a dupla faltosa recebe 0 pontos na classificação
+- **Vista pública de resultados** — na vista pública do bracket, clicar num jogo concluído abre um modal de leitura com o resultado set a set, tie-breaks e vencedor; jogos pendentes/em curso não são clicáveis para o público
 
 ### Classificação em grupos (Round Robin / Fase de Grupos)
 
-Tabela com colunas: **J** (jogos disputados), **V** (vitórias), **D** (derrotas), **SG** (sets ganhos), **SP** (sets perdidos), **SS** (saldo de sets), **JG** (jogos/games ganhos), **JP** (jogos perdidos), **SJ** (saldo de jogos).
+Tabela com colunas: **J** (jogos disputados), **V** (vitórias), **D** (derrotas), **Pts** (pontos), **SG** (sets ganhos), **SP** (sets perdidos), **SS** (saldo de sets), **JG** (jogos/games ganhos), **JP** (jogos perdidos), **SJ** (saldo de jogos).
 
-Critérios de desempate (por ordem):
-1. Vitórias
-2. Saldo de sets (SG − SP)
-3. Saldo de jogos (JG − JP)
-4. Confronto directo (h2h wins)
-5. Saldo de jogos no confronto directo
+**Sistema de pontos:**
+
+| Resultado | Pontos |
+|-----------|--------|
+| Vitória | 3 |
+| Derrota (normal) | 1 |
+| Derrota por W/O (falta de comparência) | 0 |
+
+Critérios de ordenação (por ordem):
+1. **Pontos** (Pts)
+2. Vitórias
+3. Saldo de sets (SG − SP)
+4. Saldo de jogos (JG − JP)
+5. Confronto directo (h2h wins)
+6. Saldo de jogos no confronto directo
 
 ### Gestão de torneios (admin)
 - **Editar** — nome, descrição, número de campos, datas de início/fim, torneio público, inscrições abertas
@@ -228,7 +239,9 @@ O valor `slotMinutes` definido na criação é herdado pelo agendador automátic
 
 ### Estatísticas
 - Página `/tournament/[slug]/stats` com classificação de todas as duplas
-- Colunas: jogos disputados, vitórias, derrotas, % vitórias, sets+/-, games+/-
+- Colunas idênticas à tabela de grupos: **J**, **V**, **D**, **Pts**, **SG**, **SP**, **SS** (sempre visíveis), **JG**, **JP**, **SJ** (ocultas em mobile)
+- Ordenação: pontos → vitórias → saldo de sets
+- Inclui jogos por walkover: a dupla faltosa contabiliza derrota com 0 pontos
 
 ### Exportação
 - `/tournament/[slug]/export?format=csv` — todos os jogos em CSV
@@ -399,14 +412,15 @@ src/
 │   │   ├── MatchCard.tsx                 # Cartão de jogo (destaque vencedor)
 │   │   ├── SingleEliminationBracket.tsx  # Vista desktop + tabs mobile por ronda
 │   │   ├── DoubleEliminationBracket.tsx  # Winners/Losers/Final com tabs mobile
-│   │   ├── RoundRobinTable.tsx           # Classificação (J/V/D/SG/SP/SS/JG/JP/SJ) + jogos
+│   │   ├── RoundRobinTable.tsx           # Classificação (J/V/D/Pts/SG/SP/SS/JG/JP/SJ) + jogos
 │   │   ├── GroupStageView.tsx            # Grupos com tabs mobile
 │   │   └── BracketConnector.tsx          # Linhas SVG entre jogos
 │   ├── tournament/
 │   │   ├── CreateTournamentForm.tsx      # Criação: modo/formato/séries/campos/disponibilidade/capacidade
 │   │   ├── PlayerList.tsx                # Duplas: drag & drop, bulk import, check-in (passa categoryId)
 │   │   ├── MyTournaments.tsx             # Painel localStorage
-│   │   ├── ScoreInputModal.tsx           # Introdução de resultados com +/− buttons
+│   │   ├── ScoreInputModal.tsx           # Introdução de resultados com +/− buttons; registo de W/O
+│   │   ├── MatchResultModal.tsx          # Modal de leitura de resultados (vista pública)
 │   │   ├── TournamentHeader.tsx          # Editar (c/ startDate/endDate) / Eliminar / Clonar
 │   │   ├── LinkShare.tsx                 # Partilhar link + QR code
 │   │   ├── ScheduleManager.tsx           # Agenda global: tabela, filtro multi-série, auto-schedule, conflitos
@@ -421,8 +435,8 @@ src/
 │   ├── fpp-bracket.ts                    # getFPPConfig (sistema por nº duplas) + fppKnockoutOrder
 │   ├── fpp-format.ts                     # getFppFormatForCategory — determina matchFormat + systemType (FPP Auto)
 │   ├── categories.ts                     # FPP_CATEGORIES (34 séries); getCategoryName
-│   ├── scoring.ts                        # Formatos FPP + FFT; determineSetWinner; validateScores
-│   ├── standings.ts                      # computeGroupStandings (5 critérios de desempate)
+│   ├── scoring.ts                        # Formatos FPP + FFT; determineSetWinner; validateScores; buildWalkoverScores
+│   ├── standings.ts                      # computeGroupStandings (pontos + 6 critérios de desempate)
 │   ├── bulk-import.ts                    # parseBulkText — parser de importação em massa
 │   ├── my-tournaments.ts                 # localStorage helpers
 │   ├── validators.ts                     # Zod schemas (tournamentMode; categories; startDate/endDate/slotMinutes)
@@ -451,7 +465,8 @@ prisma/
     ├── 20260426_starpoint/
     ├── 20260427_categories/              # Adiciona Category; tournamentMode; categoryId em Player/Match/Registration
     ├── 20260427_schedule/               # Adiciona slotMinutes e scheduleDays ao Tournament; startedAt ao Match
-    └── 20260429_tournament_dates/       # Adiciona startDate e endDate ao Tournament
+    ├── 20260429_tournament_dates/       # Adiciona startDate e endDate ao Tournament
+    └── 20260429_walkover/               # Adiciona walkover String? ao Match
 
 scripts/
 ├── setup-db.mjs                          # Cria/actualiza DB e aplica migrations (idempotente)
@@ -527,6 +542,7 @@ model Match {
   scheduledAt      DateTime?
   court            String?
   startedAt        DateTime? // preenchido ao clicar "Iniciar jogo"; usado pelo delay-push
+  walkover         String?   // "team1" | "team2" — equipa que não compareceu (falta de comparência)
   status           String    // pending | in_progress | completed | bye
   nextMatchId      String?
   loserNextMatchId String?
@@ -595,9 +611,9 @@ Para cada jogo a agendar, o `notBefore = max(courtFree, team1Free, team2Free)`. 
 | Setup script | Adicionar ao array `migrations` em `scripts/setup-db.mjs` | N/A |
 | Gerar client | `npm run db:setup` | Idem |
 
-**Formatos de jogo (scoring)**: `src/lib/scoring.ts` é a fonte de verdade para toda a lógica de validação e determinação de vencedor. Os formatos FPP (PRO, PROPO, M3S, M3SPO, M3, M3PO) são aliases dos FFT equivalentes — `getFormatStructure` delega para o formato FFT correspondente. A detecção do Super Tie-Break é feita por `structure[i].type === "superTiebreak"`, nunca por nome de formato.
+**Formatos de jogo (scoring)**: `src/lib/scoring.ts` é a fonte de verdade para toda a lógica de validação e determinação de vencedor. Os formatos FPP (PRO, PROPO, M3S, M3SPO, M3, M3PO) são aliases dos FFT equivalentes — `getFormatStructure` delega para o formato FFT correspondente. A detecção do Super Tie-Break é feita por `structure[i].type === "superTiebreak"`, nunca por nome de formato. `buildWalkoverScores(format, winnerSide)` gera o score de W/O para um dado formato: cada set não-condicional fica com `maxGames-0` (ex. M3SPO → `[{team1:6,team2:0},{team1:6,team2:0}]`; D1 → `[{team1:9,team2:0}]`; E → `[{team1:10,team2:0,superTiebreak:true}]`).
 
-**Standings (classificação de grupos)**: `computeGroupStandings` em `src/lib/standings.ts` é a única fonte de verdade — usada pela tabela visual (`RoundRobinTable`) e pelo servidor ao avançar jogadores para o knockout. Critérios: vitórias → saldo sets → saldo jogos → h2h wins → saldo jogos h2h. Inclui contador `played` para a coluna J.
+**Standings (classificação de grupos)**: `computeGroupStandings` em `src/lib/standings.ts` é a única fonte de verdade — usada pela tabela visual (`RoundRobinTable`), pela página de estatísticas e pelo servidor ao avançar jogadores para o knockout. Sistema de pontos: vitória=3, derrota normal=1, derrota por W/O=0. Critérios de ordenação: pontos → vitórias → saldo sets → saldo jogos → h2h wins → saldo jogos h2h. Jogos por walkover sem scores (dados legados) são aceites — contabilizam win/loss/pts mas sem set/game data.
 
 **Formato FPP automático (`fpp_auto`)**: o formato é apenas uma etiqueta guardada no torneio. O sistema de grupos (1, 2 ou 3 grupos, ou eliminação directa) é determinado em `src/lib/fpp-bracket.ts → getFPPConfig(playerCount)` **no momento de gerar o bracket**, quando o número de duplas confirmadas é conhecido. O seeding cross-grupo (`fppKnockoutOrder`) garante que nenhum par do mesmo grupo se cruza na primeira ronda do knockout.
 

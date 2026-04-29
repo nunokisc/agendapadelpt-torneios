@@ -13,6 +13,7 @@ import LinkShare from "@/components/tournament/LinkShare";
 import ScheduleManager from "@/components/tournament/ScheduleManager";
 import RegistrationPanel from "@/components/tournament/RegistrationPanel";
 import ScoreInputModal from "@/components/tournament/ScoreInputModal";
+import MatchResultModal from "@/components/tournament/MatchResultModal";
 import SingleEliminationBracket from "@/components/bracket/SingleEliminationBracket";
 import DoubleEliminationBracket from "@/components/bracket/DoubleEliminationBracket";
 import RoundRobinTable from "@/components/bracket/RoundRobinTable";
@@ -276,9 +277,9 @@ export default function TournamentPage() {
   }
 
   function handleMatchClick(match: Match) {
-    if (!isAdmin) return;
     if (match.status === "bye") return;
     if (!match.team1Id || !match.team2Id) return;
+    if (!isAdmin && match.status !== "completed") return;
     setSelectedMatch(match);
   }
 
@@ -636,14 +637,21 @@ export default function TournamentPage() {
         </div>
       )}
 
-      <ScoreInputModal
-        match={selectedMatch}
-        slug={slug}
-        token={token}
-        matchFormat={activeMatchFormat}
-        onClose={() => setSelectedMatch(null)}
-        onSaved={fetchData}
-      />
+      {isAdmin ? (
+        <ScoreInputModal
+          match={selectedMatch}
+          slug={slug}
+          token={token}
+          matchFormat={activeMatchFormat}
+          onClose={() => setSelectedMatch(null)}
+          onSaved={fetchData}
+        />
+      ) : (
+        <MatchResultModal
+          match={selectedMatch}
+          onClose={() => setSelectedMatch(null)}
+        />
+      )}
 
       {showManageCategories && (
         <ManageCategoriesModal
