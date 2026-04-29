@@ -126,14 +126,15 @@ export default function StatsPage() {
                 <tr className="text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100 dark:border-slate-800">
                   <th className="text-left py-2 px-2">#</th>
                   <th className="text-left py-2 px-2">Dupla</th>
-                  <th className="text-center py-2 px-2">J</th>
-                  <th className="text-center py-2 px-2">V</th>
-                  <th className="text-center py-2 px-2">D</th>
-                  <th className="text-center py-2 px-2 hidden sm:table-cell">%V</th>
-                  <th className="text-center py-2 px-2 hidden sm:table-cell">S+</th>
-                  <th className="text-center py-2 px-2 hidden sm:table-cell">S-</th>
-                  <th className="text-center py-2 px-2 hidden md:table-cell">J+</th>
-                  <th className="text-center py-2 px-2 hidden md:table-cell">J-</th>
+                  <th className="text-center py-2 px-2" title="Jogos disputados">J</th>
+                  <th className="text-center py-2 px-2" title="Vitórias">V</th>
+                  <th className="text-center py-2 px-2" title="Derrotas">D</th>
+                  <th className="text-center py-2 px-2" title="Sets ganhos">SG</th>
+                  <th className="text-center py-2 px-2" title="Sets perdidos">SP</th>
+                  <th className="text-center py-2 px-2" title="Saldo de sets">SS</th>
+                  <th className="text-center py-2 px-2 hidden sm:table-cell" title="Jogos ganhos">JG</th>
+                  <th className="text-center py-2 px-2 hidden sm:table-cell" title="Jogos perdidos">JP</th>
+                  <th className="text-center py-2 px-2 hidden sm:table-cell" title="Saldo de jogos">SJ</th>
                 </tr>
               </thead>
               <tbody>
@@ -146,14 +147,19 @@ export default function StatsPage() {
                         <p className="text-xs text-slate-400">{s.player.player1Name} / {s.player.player2Name}</p>
                       )}
                     </td>
-                    <td className="py-2.5 px-2 text-center text-slate-600 dark:text-slate-400 font-mono">{s.played}</td>
+                    <td className="py-2.5 px-2 text-center text-slate-500 dark:text-slate-400 font-mono">{s.played}</td>
                     <td className="py-2.5 px-2 text-center text-[#0E7C66] dark:text-[#A3E635] font-bold">{s.wins}</td>
                     <td className="py-2.5 px-2 text-center text-red-500 font-mono">{s.losses}</td>
-                    <td className="py-2.5 px-2 text-center hidden sm:table-cell text-slate-600 dark:text-slate-400">{s.winPct}%</td>
-                    <td className="py-2.5 px-2 text-center hidden sm:table-cell text-slate-600 dark:text-slate-400">{s.setsFor}</td>
-                    <td className="py-2.5 px-2 text-center hidden sm:table-cell text-slate-600 dark:text-slate-400">{s.setsAgainst}</td>
-                    <td className="py-2.5 px-2 text-center hidden md:table-cell text-slate-600 dark:text-slate-400">{s.gamesFor}</td>
-                    <td className="py-2.5 px-2 text-center hidden md:table-cell text-slate-600 dark:text-slate-400">{s.gamesAgainst}</td>
+                    <td className="py-2.5 px-2 text-center text-slate-600 dark:text-slate-400">{s.setsFor}</td>
+                    <td className="py-2.5 px-2 text-center text-slate-600 dark:text-slate-400">{s.setsAgainst}</td>
+                    <td className="py-2.5 px-2 text-center font-medium text-slate-700 dark:text-slate-300">
+                      {s.setsFor - s.setsAgainst > 0 ? `+${s.setsFor - s.setsAgainst}` : s.setsFor - s.setsAgainst}
+                    </td>
+                    <td className="py-2.5 px-2 text-center hidden sm:table-cell text-slate-600 dark:text-slate-400">{s.gamesFor}</td>
+                    <td className="py-2.5 px-2 text-center hidden sm:table-cell text-slate-600 dark:text-slate-400">{s.gamesAgainst}</td>
+                    <td className="py-2.5 px-2 text-center hidden sm:table-cell font-medium text-slate-700 dark:text-slate-300">
+                      {s.gamesFor - s.gamesAgainst > 0 ? `+${s.gamesFor - s.gamesAgainst}` : s.gamesFor - s.gamesAgainst}
+                    </td>
                   </tr>
                 ))}
               </tbody>

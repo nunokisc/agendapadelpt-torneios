@@ -8,6 +8,7 @@ import DoubleEliminationBracket from "@/components/bracket/DoubleEliminationBrac
 import RoundRobinTable from "@/components/bracket/RoundRobinTable";
 import GroupStageView from "@/components/bracket/GroupStageView";
 import ScoreInputModal from "@/components/tournament/ScoreInputModal";
+import MatchResultModal from "@/components/tournament/MatchResultModal";
 import type { Tournament, Player, Match, Category } from "@/types";
 
 interface TournamentData {
@@ -50,9 +51,9 @@ export default function FullscreenBracketPage() {
   }
 
   function handleMatchClick(match: Match) {
-    if (!isAdmin) return;
     if (match.status === "bye") return;
     if (!match.team1Id || !match.team2Id) return;
+    if (!isAdmin && match.status !== "completed") return;
     setSelectedMatch(match);
   }
 
@@ -173,7 +174,7 @@ export default function FullscreenBracketPage() {
         {renderBracket()}
       </div>
 
-      {isAdmin && (
+      {isAdmin ? (
         <ScoreInputModal
           match={selectedMatch}
           slug={slug}
@@ -181,6 +182,11 @@ export default function FullscreenBracketPage() {
           matchFormat={activeMatchFormat}
           onClose={() => setSelectedMatch(null)}
           onSaved={fetchData}
+        />
+      ) : (
+        <MatchResultModal
+          match={selectedMatch}
+          onClose={() => setSelectedMatch(null)}
         />
       )}
     </div>

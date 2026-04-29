@@ -64,6 +64,13 @@ export default function MatchCard({ match, isAdmin, onClick, onStart, highlight,
     match.team1Id &&
     match.team2Id;
 
+  const canView =
+    !isAdmin &&
+    isCompleted &&
+    !!match.team1Id &&
+    !!match.team2Id &&
+    !!onClick;
+
   const isRescore = canEdit && isCompleted;
   const canStart = canEdit && match.status === "pending" && !!onStart;
 
@@ -141,11 +148,11 @@ export default function MatchCard({ match, isAdmin, onClick, onStart, highlight,
         compact ? "w-full" : "w-[260px]",
         "rounded-lg border-2 overflow-hidden transition-all select-none",
         highlight ? "border-yellow-400 shadow-yellow-200 shadow-md dark:border-yellow-500 dark:shadow-yellow-900/50" : statusBg,
-        (canEdit && !isInProgress) && "cursor-pointer hover:border-[#0E7C66]/50 hover:shadow-md active:scale-95"
+        ((canEdit && !isInProgress) || canView) && "cursor-pointer hover:border-[#0E7C66]/50 hover:shadow-md active:scale-95"
       )}
       style={{ minHeight: 72 }}
-      onClick={(canEdit && !isInProgress) ? onClick : undefined}
-      title={canEdit && !isInProgress ? (isRescore ? "Clica para editar resultado" : "Clica para introduzir resultado") : undefined}
+      onClick={(canEdit && !isInProgress) || canView ? onClick : undefined}
+      title={canView ? "Ver resultado" : canEdit && !isInProgress ? (isRescore ? "Clica para editar resultado" : "Clica para introduzir resultado") : undefined}
     >
       {isBye ? (
         <div className="flex items-center justify-center h-full py-4 text-xs text-gray-400 italic">
